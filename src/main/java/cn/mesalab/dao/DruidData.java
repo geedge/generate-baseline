@@ -6,6 +6,7 @@ import cn.mesalab.utils.DruidUtils;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.apache.calcite.avatica.AvaticaConnection;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 /**
@@ -91,7 +93,39 @@ public class DruidData {
                 + " = '" + attackType + "'"
                 + " AND " + timeFilter;
 
-//        System.out.println("getTimeSeriesData:" + sql);
+        try{
+            ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
+            ResultSetToListService service  = new ResultSetToListServiceImp();
+            rsList = service.selectAll(resultSet);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return rsList;
+    }
+
+    public List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
+        List<Map<String, Object>> rsList = null;
+        try{
+            rsList = allData.stream().
+                    filter(i->((i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip))
+                            & (i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType))))
+                    .collect(Collectors.toList());
+        } catch (NullPointerException e){
+        }
+        return rsList;
+    }
+
+    public List<Map<String, Object>> readFromDruid(List<String> ipList){
+        List<Map<String, Object>> rsList = null;
+        ipList = ipList.stream().map( ip -> "\'"+ip+"\'").collect(Collectors.toList());
+        String ipString = "(" + StringUtils.join(ipList, ",").toString() + ")";
+        String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
+                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " FROM " + ApplicationConfig.DRUID_TABLE
+                + " WHERE " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + " IN " + ipString
+                + " AND " + timeFilter;
         try{
             ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             ResultSetToListService service  = new ResultSetToListServiceImp();

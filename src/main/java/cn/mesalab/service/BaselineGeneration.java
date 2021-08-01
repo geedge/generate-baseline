@@ -29,6 +29,8 @@ public class BaselineGeneration {
     private static HbaseUtils hbaseUtils;
     private static Table hbaseTable;
 
+    private static List<Map<String, Object>> batchDruidData = new ArrayList<>();
+
     private static final Integer BASELINE_POINT_NUM = ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
     public static void perform() {
@@ -106,9 +108,15 @@ public class BaselineGeneration {
         Long startGenerateTime = System.currentTimeMillis();
 
         druidData = DruidData.getInstance();
+
+        batchDruidData = druidData.readFromDruid(ipList);
+
         List<Put> putList = new ArrayList<>();
         for(String ip: ipList){
             int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
+            if (ipBaseline==null){
+                break;
+            }
             putList = hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
         }
 
@@ -118,7 +126,7 @@ public class BaselineGeneration {
 
         try {
             hbaseTable.put(putList);
-            LOG.info("HBase 写入数据条数 " + ApplicationConfig.GENERATE_BATCH_NUM);
+            LOG.info("HBase 处理数据条数 " + ApplicationConfig.GENERATE_BATCH_NUM);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -130,7 +138,12 @@ public class BaselineGeneration {
     private static int[] generateSingleIpBaseline(String ip, String attackType){
         // 查询
         Long startQuerySingleIPTime = System.currentTimeMillis();
-        List<Map<String, Object>> originSeries = druidData.getTimeSeriesData(ip, attackType);
+        List<Map<String, Object>> originSeries = druidData.getTimeSeriesData(batchDruidData, ip, attackType);
+
+        if (originSeries==null){
+            return null;
+        }
+
         Long endQuerySingleIPTime = System.currentTimeMillis();
         LOG.info("性能测试：单个ip查询耗时——"+(endQuerySingleIPTime-startQuerySingleIPTime));
 
