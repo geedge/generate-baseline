@@ -6,7 +6,6 @@ import cn.mesalab.utils.DruidUtils;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.apache.calcite.avatica.AvaticaConnection;
-import org.apache.calcite.avatica.AvaticaStatement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,34 +27,39 @@ public class DruidData {
     private static final Logger LOG = LoggerFactory.getLogger(DruidData.class);
     private static DruidData druidData;
 
-    private static DruidUtils druidUtils;
+    private AvaticaConnection connection;
+
+    {
+        try {
+            connection = DruidUtils.getConn();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+    }
+
 
     private String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
             + " >= MILLIS_TO_TIMESTAMP(" + getTimeLimit()._2
             + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
             + " < MILLIS_TO_TIMESTAMP(" + getTimeLimit()._1 + ")";
 
-    static {
-        druidUtils = DruidUtils.getInstance();
-    }
 
 
     public static DruidData getInstance() {
-        if (druidData == null){
-            druidData = new DruidData();
-        }
+        druidData = new DruidData();
         return druidData;
     }
 
     public ArrayList<String> getServerIpList(String attackType) {
+        Long startQueryIPLIstTime = System.currentTimeMillis();
         ArrayList<String> serverIPs = new ArrayList<String>();
         String sql = "SELECT distinct " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
                 + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME + " = '" + attackType + "'"
                 + " AND " + timeFilter
-                + " LIMIT 20"; // FOR TEST
+                + " LIMIT 100"; // FOR TEST
         try{
-            ResultSet resultSet = druidUtils.executeQuery(sql);
+            ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             while(resultSet.next()){
                 String ip = resultSet.getString(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
                 serverIPs.add(ip);
@@ -63,6 +67,9 @@ public class DruidData {
         } catch (Exception e){
             e.printStackTrace();
         }
+        Long endQueryIPListTime = System.currentTimeMillis();
+        LOG.info("性能测试：ip list查询耗时——"+(endQueryIPListTime-startQueryIPLIstTime));
+
         return serverIPs;
     }
 
@@ -84,9 +91,9 @@ public class DruidData {
                 + " = '" + attackType + "'"
                 + " AND " + timeFilter;
 
-        System.out.println("getTimeSeriesData:" + sql);
+//        System.out.println("getTimeSeriesData:" + sql);
         try{
-            ResultSet resultSet = druidUtils.executeQuery(sql);
+            ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             ResultSetToListService service  = new ResultSetToListServiceImp();
             rsList = service.selectAll(resultSet);
         } catch (Exception e){
@@ -129,6 +136,10 @@ public class DruidData {
     }
 
     public void closeConn(){
-        druidUtils.closeConnection();
+        try {
+            DruidUtils.closeConnection();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
     }
 }

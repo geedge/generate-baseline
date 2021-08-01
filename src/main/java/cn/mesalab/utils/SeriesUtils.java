@@ -143,8 +143,6 @@ public class SeriesUtils {
         if(denominator>0) {
             result = numerator / denominator;
         }
-        //FOR TEST
-        System.out.println(result);
         return result;
     }
 

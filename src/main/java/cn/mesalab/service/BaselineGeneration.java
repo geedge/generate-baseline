@@ -42,9 +42,9 @@ public class BaselineGeneration {
 
         try{
             generateBaselinesThread(ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD);
-            //generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD);
-            //generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD);
-            //generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL);
+//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD);
+//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD);
+//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL);
 
             long last = System.currentTimeMillis();
             LOG.warn("运行时间:" + (last - start));
@@ -102,25 +102,39 @@ public class BaselineGeneration {
     }
 
     public static void generateBaselines(List<String> ipList, String attackType){
+
+        Long startGenerateTime = System.currentTimeMillis();
+
+        druidData = DruidData.getInstance();
         List<Put> putList = new ArrayList<>();
         for(String ip: ipList){
             int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
             putList = hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
         }
+
+        Long endGenerateTime = System.currentTimeMillis();
+
+//        LOG.info("性能测试：Baseline生成耗时——"+(endGenerateTime-startGenerateTime));
+
         try {
             hbaseTable.put(putList);
             LOG.info("HBase 写入数据条数 " + ApplicationConfig.GENERATE_BATCH_NUM);
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        Long endWriteTime = System.currentTimeMillis();
+//        LOG.info("性能测试：Baseline写入耗时——"+(endWriteTime-endGenerateTime));
     }
 
     private static int[] generateSingleIpBaseline(String ip, String attackType){
         // 查询
+        Long startQuerySingleIPTime = System.currentTimeMillis();
         List<Map<String, Object>> originSeries = druidData.getTimeSeriesData(ip, attackType);
+        Long endQuerySingleIPTime = System.currentTimeMillis();
+        LOG.info("性能测试：单个ip查询耗时——"+(endQuerySingleIPTime-startQuerySingleIPTime));
+
         // 时间序列缺失值补0
-        System.out.println("当前线程id"+Thread.currentThread().getId());
-        System.out.println("origin 大小"+originSeries.size());
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(originSeries);
 
         int[] baselineArr = new int[completSeries.size()];
@@ -148,8 +162,9 @@ public class BaselineGeneration {
             }
         }
 
-        System.out.println(ip);
-        System.out.println(Arrays.toString(baselineArr));
+        Long endGenerateSingleIPTime = System.currentTimeMillis();
+        LOG.info("性能测试：单个baseline生成耗时——"+(endGenerateSingleIPTime-endQuerySingleIPTime));
+
         return baselineArr;
     }
 
