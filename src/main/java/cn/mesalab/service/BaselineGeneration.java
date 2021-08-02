@@ -5,6 +5,7 @@ import cn.mesalab.dao.DruidData;
 import cn.mesalab.service.BaselineService.KalmanFilter;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.SeriesUtils;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.hbase.client.Put;
@@ -30,6 +31,12 @@ public class BaselineGeneration {
     private static Table hbaseTable;
     private static List<Map<String, Object>> batchDruidData = new ArrayList<>();
 
+    private static List<String> attackTypeList = Arrays.asList(
+            ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL
+    );
     private static final Integer BASELINE_POINT_NUM = ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
     public static void perform() {
@@ -42,10 +49,7 @@ public class BaselineGeneration {
         LOG.info("Druid 成功建立连接");
 
         try{
-            generateBaselinesThread(ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD);
-            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD);
-//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD);
-//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL);
+            generateBaselinesThread();
 
             long last = System.currentTimeMillis();
             LOG.warn("运行时间:" + (last - start));
@@ -60,11 +64,11 @@ public class BaselineGeneration {
         System.exit(0);
     }
 
-    private static void generateBaselinesThread(String attackType) throws InterruptedException {
+    private static void generateBaselinesThread() throws InterruptedException {
         int threadNum = Runtime.getRuntime().availableProcessors();
 
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder()
-                .setNameFormat(attackType+"-baseline-demo-%d").build();
+                .setNameFormat("baseline-demo-%d").build();
 
         // 创建线程池
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
@@ -77,57 +81,49 @@ public class BaselineGeneration {
                 new ThreadPoolExecutor.AbortPolicy());
 
         // baseline 生成及写入
-        ArrayList<String> destinationIps = druidData.getServerIpList(attackType);
-        LOG.info("查询到服务端ip共 " +destinationIps.size() + " 个");
+        ArrayList<String> destinationIps = druidData.getServerIpList();
+        LOG.info("共查询到服务端ip " +destinationIps.size() + " 个");
+        LOG.info("Baseline batch 大小: " + ApplicationConfig.GENERATE_BATCH_SIZE);
 
-        int batchCount = destinationIps.size() / ApplicationConfig.GENERATE_BATCH_NUM;
-
-        for (int batchCurrent = 0; batchCurrent <batchCount; batchCurrent++){
-            List<String> batchIps = destinationIps.subList(batchCurrent*ApplicationConfig.GENERATE_BATCH_NUM,
-                    (batchCurrent+1)*ApplicationConfig.GENERATE_BATCH_NUM);
+        List<List<String>> batchIpLists = Lists.partition(destinationIps, ApplicationConfig.GENERATE_BATCH_SIZE);
+        for (List<String> batchIps: batchIpLists){
             if(batchIps.size()>0){
-                executor.execute(() -> generateBaselines(batchIps, attackType));
+                executor.execute(() -> generateBaselines(batchIps));
             }
         }
 
         executor.shutdown();
-        executor.awaitTermination(10L, TimeUnit.SECONDS);
+        executor.awaitTermination(10L, TimeUnit.HOURS);
+    }
 
-        LOG.info("BaselineGeneration 完成:" + attackType);
+    static void generateBaselines(){
+        ArrayList<String> destinationIps = druidData.getServerIpList();
+        generateBaselines(destinationIps);
         LOG.info("BaselineGeneration 共写入数据条数：" + destinationIps.size());
     }
 
-    static void generateBaselines(String attackType){
-        ArrayList<String> destinationIps = druidData.getServerIpList(attackType);
-        generateBaselines(destinationIps, attackType);
-        LOG.info("BaselineGeneration 完成:" + attackType);
-        LOG.info("BaselineGeneration 共写入数据条数：" + destinationIps.size());
-    }
-
-    public static void generateBaselines(List<String> ipList, String attackType){
+    public static void generateBaselines(List<String> ipList){
 
         Long startGenerateTime = System.currentTimeMillis();
 
         druidData = DruidData.getInstance();
-
         batchDruidData = druidData.readFromDruid(ipList);
 
         List<Put> putList = new ArrayList<>();
-        for(String ip: ipList){
-            int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
-            if (ipBaseline==null){
-                break;
+        for(String attackType: attackTypeList){
+            for(String ip: ipList){
+                int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
+                if (!(ipBaseline ==null)){
+                    putList = hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
+                }
             }
-            putList = hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
         }
 
         Long endGenerateTime = System.currentTimeMillis();
 
-//        LOG.info("性能测试：Baseline生成耗时——"+(endGenerateTime-startGenerateTime));
-
         try {
             hbaseTable.put(putList);
-            LOG.info("HBase 处理数据条数 " + ApplicationConfig.GENERATE_BATCH_NUM);
+            LOG.info("Baseline 线程 " +  Thread.currentThread().getId() + " 成功写入Baseline条数共计 " + putList.size());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -178,6 +174,8 @@ public class BaselineGeneration {
 
         Long endGenerateSingleIPTime = System.currentTimeMillis();
         //LOG.info("性能测试：单个baseline生成耗时——"+(endGenerateSingleIPTime-endQuerySingleIPTime));
+        //System.out.println(ip);
+        //System.out.println(attackType + Arrays.toString(baselineArr));
 
         return baselineArr;
     }

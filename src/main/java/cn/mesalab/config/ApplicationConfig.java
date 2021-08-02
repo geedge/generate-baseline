@@ -48,6 +48,6 @@ public class ApplicationConfig {
     public static final Double BASELINE_KALMAN_R = ConfigUtils.getDoubleProperty("baseline.kalman.r");
 
     public static final Integer LOG_WRITE_COUNT = ConfigUtils.getIntProperty("log.write.count");
-    public static final Integer GENERATE_BATCH_NUM= ConfigUtils.getIntProperty("generate.batch.number");
+    public static final Integer GENERATE_BATCH_SIZE = ConfigUtils.getIntProperty("generate.batch.size");
 }
 

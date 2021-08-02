@@ -52,14 +52,13 @@ public class DruidData {
         return druidData;
     }
 
-    public ArrayList<String> getServerIpList(String attackType) {
+    public ArrayList<String> getServerIpList() {
         Long startQueryIPLIstTime = System.currentTimeMillis();
         ArrayList<String> serverIPs = new ArrayList<String>();
         String sql = "SELECT distinct " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME + " = '" + attackType + "'"
-                + " AND " + timeFilter
-                + " LIMIT 10"; // FOR TEST
+                + " WHERE " + timeFilter
+                + " LIMIT 10000";// FOR TEST
         try{
             ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             while(resultSet.next()){
@@ -75,39 +74,12 @@ public class DruidData {
         return serverIPs;
     }
 
-    public ArrayList<String> getServerIpList(String attackType, String test) {
-        ArrayList<String> serverIPs = new ArrayList<String>();
-        serverIPs.add("153.99.250.54");
-        return serverIPs;
-    }
-
-    public List<Map<String, Object>> getTimeSeriesData(String ip, String attackType){
-        List<Map<String, Object>> rsList = null;
-        String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
-                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-                + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + " = '" + ip + "'"
-                + " AND " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + " = '" + attackType + "'"
-                + " AND " + timeFilter;
-
-        try{
-            ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
-            ResultSetToListService service  = new ResultSetToListServiceImp();
-            rsList = service.selectAll(resultSet);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-        return rsList;
-    }
-
     public List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
         List<Map<String, Object>> rsList = new ArrayList<>();
         try{
             rsList = allData.stream().
-                    filter(i->(i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip)))
+                    filter(i->((i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip))
+                            )&&(i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType)))
                     .collect(Collectors.toList());
         } catch (NullPointerException e){
         }
@@ -119,6 +91,7 @@ public class DruidData {
         ipList = ipList.stream().map( ip -> "\'"+ip+"\'").collect(Collectors.toList());
         String ipString = "(" + StringUtils.join(ipList, ",").toString() + ")";
         String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
                 + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
                 + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
