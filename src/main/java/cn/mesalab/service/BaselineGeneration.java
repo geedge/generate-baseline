@@ -28,7 +28,6 @@ public class BaselineGeneration {
     private static DruidData druidData;
     private static HbaseUtils hbaseUtils;
     private static Table hbaseTable;
-
     private static List<Map<String, Object>> batchDruidData = new ArrayList<>();
 
     private static final Integer BASELINE_POINT_NUM = ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
@@ -44,7 +43,7 @@ public class BaselineGeneration {
 
         try{
             generateBaselinesThread(ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD);
-//            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD);
+            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD);
 //            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD);
 //            generateBaselines(ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL);
 
@@ -86,7 +85,9 @@ public class BaselineGeneration {
         for (int batchCurrent = 0; batchCurrent <batchCount; batchCurrent++){
             List<String> batchIps = destinationIps.subList(batchCurrent*ApplicationConfig.GENERATE_BATCH_NUM,
                     (batchCurrent+1)*ApplicationConfig.GENERATE_BATCH_NUM);
-            executor.execute(() -> generateBaselines(batchIps, attackType));
+            if(batchIps.size()>0){
+                executor.execute(() -> generateBaselines(batchIps, attackType));
+            }
         }
 
         executor.shutdown();
