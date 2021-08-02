@@ -59,7 +59,7 @@ public class DruidData {
                 + " FROM " + ApplicationConfig.DRUID_TABLE
                 + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME + " = '" + attackType + "'"
                 + " AND " + timeFilter
-                + " LIMIT 100"; // FOR TEST
+                + " LIMIT 10"; // FOR TEST
         try{
             ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             while(resultSet.next()){
@@ -104,7 +104,7 @@ public class DruidData {
     }
 
     public List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
-        List<Map<String, Object>> rsList = null;
+        List<Map<String, Object>> rsList = new ArrayList<>();
         try{
             rsList = allData.stream().
                     filter(i->(i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip)))

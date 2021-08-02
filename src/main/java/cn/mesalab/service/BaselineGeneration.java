@@ -140,12 +140,12 @@ public class BaselineGeneration {
         Long startQuerySingleIPTime = System.currentTimeMillis();
         List<Map<String, Object>> originSeries = druidData.getTimeSeriesData(batchDruidData, ip, attackType);
 
-        if (originSeries==null){
+        if (originSeries.size()==0){
             return null;
         }
 
         Long endQuerySingleIPTime = System.currentTimeMillis();
-        LOG.info("性能测试：单个ip查询耗时——"+(endQuerySingleIPTime-startQuerySingleIPTime));
+        //LOG.info("性能测试：单个ip查询耗时——"+(endQuerySingleIPTime-startQuerySingleIPTime));
 
         // 时间序列缺失值补0
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(originSeries);
@@ -176,7 +176,7 @@ public class BaselineGeneration {
         }
 
         Long endGenerateSingleIPTime = System.currentTimeMillis();
-        LOG.info("性能测试：单个baseline生成耗时——"+(endGenerateSingleIPTime-endQuerySingleIPTime));
+        //LOG.info("性能测试：单个baseline生成耗时——"+(endGenerateSingleIPTime-endQuerySingleIPTime));
 
         return baselineArr;
     }
