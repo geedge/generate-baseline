@@ -66,6 +66,8 @@ public class BaselineGeneration {
 
     private static void generateBaselinesThread() throws InterruptedException {
         int threadNum = Runtime.getRuntime().availableProcessors();
+//        int threadNum = 10;
+
 
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-demo-%d").build();
@@ -81,7 +83,11 @@ public class BaselineGeneration {
                 new ThreadPoolExecutor.AbortPolicy());
 
         // baseline 生成及写入
+        // 耗时测试
+        Long startQueryIPList = System.currentTimeMillis();
         ArrayList<String> destinationIps = druidData.getServerIpList();
+        Long endQueryIPList = System.currentTimeMillis();
+
         LOG.info("共查询到服务端ip " +destinationIps.size() + " 个");
         LOG.info("Baseline batch 大小: " + ApplicationConfig.GENERATE_BATCH_SIZE);
 
@@ -96,18 +102,13 @@ public class BaselineGeneration {
         executor.awaitTermination(10L, TimeUnit.HOURS);
     }
 
-    static void generateBaselines(){
-        ArrayList<String> destinationIps = druidData.getServerIpList();
-        generateBaselines(destinationIps);
-        LOG.info("BaselineGeneration 共写入数据条数：" + destinationIps.size());
-    }
-
     public static void generateBaselines(List<String> ipList){
+        Long startGenerationBaselines= System.currentTimeMillis();
+        Long startReadDruidData = System.currentTimeMillis();
 
-        Long startGenerateTime = System.currentTimeMillis();
-
-        druidData = DruidData.getInstance();
         batchDruidData = druidData.readFromDruid(ipList);
+        Long endReadDruidData = System.currentTimeMillis();
+        //LOG.info("读取Druid数据耗时："+(endReadDruidData-startReadDruidData));
 
         List<Put> putList = new ArrayList<>();
         for(String attackType: attackTypeList){
@@ -119,7 +120,8 @@ public class BaselineGeneration {
             }
         }
 
-        Long endGenerateTime = System.currentTimeMillis();
+        Long endGenerationBaselines= System.currentTimeMillis();
+        //LOG.info("BaselineGeneration耗时："+(endGenerationBaselines-endReadDruidData));
 
         try {
             hbaseTable.put(putList);
@@ -129,7 +131,7 @@ public class BaselineGeneration {
         }
 
         Long endWriteTime = System.currentTimeMillis();
-//        LOG.info("性能测试：Baseline写入耗时——"+(endWriteTime-endGenerateTime));
+        //LOG.info("BaselineWriteIn耗时："+(endWriteTime-endGenerationBaselines));
     }
 
     private static int[] generateSingleIpBaseline(String ip, String attackType){
@@ -142,7 +144,6 @@ public class BaselineGeneration {
         }
 
         Long endQuerySingleIPTime = System.currentTimeMillis();
-        //LOG.info("性能测试：单个ip查询耗时——"+(endQuerySingleIPTime-startQuerySingleIPTime));
 
         // 时间序列缺失值补0
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(originSeries);

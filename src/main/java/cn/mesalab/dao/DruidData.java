@@ -57,8 +57,7 @@ public class DruidData {
         ArrayList<String> serverIPs = new ArrayList<String>();
         String sql = "SELECT distinct " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + timeFilter
-                + " LIMIT 10000";// FOR TEST
+                + " WHERE " + timeFilter;// FOR TEST
         try{
             ResultSet resultSet = DruidUtils.executeQuery(connection,sql);
             while(resultSet.next()){

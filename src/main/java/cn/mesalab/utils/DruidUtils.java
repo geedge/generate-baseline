@@ -26,6 +26,7 @@ public class DruidUtils {
      */
     public static AvaticaConnection getConn() throws SQLException {
         Properties properties = new Properties();
+        properties.setProperty("connectTimeout", String.valueOf(10*60*60));
         AvaticaConnection connection = (AvaticaConnection) DriverManager.getConnection(DRUID_URL, properties);
         threadLocal.set(connection);
         return connection;
