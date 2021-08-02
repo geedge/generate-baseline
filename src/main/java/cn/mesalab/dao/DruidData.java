@@ -107,8 +107,7 @@ public class DruidData {
         List<Map<String, Object>> rsList = null;
         try{
             rsList = allData.stream().
-                    filter(i->((i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip))
-                            & (i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType))))
+                    filter(i->(i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip)))
                     .collect(Collectors.toList());
         } catch (NullPointerException e){
         }
