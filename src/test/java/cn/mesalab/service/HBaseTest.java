@@ -37,18 +37,36 @@ public class HBaseTest {
         Table table = conn.getTable(tableName);
 
 
-        DruidData druidData = DruidData.getInstance();
-        ArrayList<String> destinationIps = druidData.getServerIpList();
+//        DruidData druidData = DruidData.getInstance();
+//        ArrayList<String> destinationIps = druidData.getServerIpList();
+        List<String> ips = Arrays.asList(
+                "192.168.1.1",
+                "192.168.1.2",
+                "192.168.1.3",
+                "192.168.1.4",
+                "192.168.1.5",
+                "192.168.1.6",
+                "192.168.1.7",
+                "192.168.1.8",
+                "192.168.10.1",
+                "192.168.10.2",
+                "192.168.10.3",
+                "192.168.10.4",
+                "192.168.10.5",
+                "192.168.10.6",
+                "192.168.10.7",
+                "192.168.10.8"
+        );
 
-        for (String ip : destinationIps){
+        for (String ip : ips){
             Get abcGet = new Get(Bytes.toBytes(ip));
             Result r = table.get(abcGet);
             ArrayWritable w = new ArrayWritable(IntWritable.class);
             List<String> attackTypeList = Arrays.asList(
                     "TCP SYN Flood",
-                    "ICMP Flood",
-                    "UDP Flood",
-                    "DNS Amplification"
+                    "ICMP Flood"
+//                    "UDP Flood",
+//                    "DNS Amplification"
             );
                 for (String attackType : attackTypeList){
                     byte[] session_nums = r.getValue(Bytes.toBytes(attackType), Bytes.toBytes("session_num"));
@@ -62,12 +80,35 @@ public class HBaseTest {
 
         }
 
-//        Get abcGet = new Get(Bytes.toBytes("1.0.0.1"));
-//        Result r = table.get(abcGet);
-//        ArrayWritable w = new ArrayWritable(IntWritable.class);
-//        w.readFields(new DataInputStream(new ByteArrayInputStream(r.getValue(Bytes.toBytes("TCP SYN Flood"), Bytes.toBytes("session_num")))));
-//        ArrayList<Integer> arr2 = fromWritable(w);
-//        System.out.println(arr2.toString());
+
+
+//        int[] arr = new int[144];
+//        Arrays.fill(arr, 100);
+//        List<String> ips = Arrays.asList(
+//                "192.168.1.1",
+//                "192.168.1.2",
+//                "192.168.1.3",
+//                "192.168.1.4",
+//                "192.168.1.5",
+//                "192.168.1.6",
+//                "192.168.1.7",
+//                "192.168.1.8",
+//                "192.168.10.1",
+//                "192.168.10.2",
+//                "192.168.10.3",
+//                "192.168.10.4",
+//                "192.168.10.5",
+//                "192.168.10.6",
+//                "192.168.10.7",
+//                "192.168.10.8"
+//        );
+//
+//        for (String ip : ips){
+//            Put put = new Put(Bytes.toBytes(ip));
+//            put.addColumn(Bytes.toBytes("ICMP Flood"),Bytes.toBytes("session_num"), WritableUtils.toByteArray(toWritable(arr)));
+//            table.put(put);
+//        }
+
 
 
     }

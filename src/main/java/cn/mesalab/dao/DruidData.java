@@ -32,10 +32,6 @@ public class DruidData {
     private static DruidData druidData;
     private AvaticaConnection connection;
     private AvaticaStatement statement;
-    private String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " >= MILLIS_TO_TIMESTAMP(" + getTimeLimit()._2
-            + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " < MILLIS_TO_TIMESTAMP(" + getTimeLimit()._1 + ")";
 
 
     {
@@ -69,13 +65,13 @@ public class DruidData {
      * 获取distinct server ip
      * @return ArrayList<String> ip列表
      */
-    public ArrayList<String> getServerIpList() {
+    public static ArrayList<String> getServerIpList(AvaticaStatement statement, String timeFilter) {
         Long startQueryIpLIstTime = System.currentTimeMillis();
         ArrayList<String> serverIps = new ArrayList<String>();
         String sql = "SELECT distinct " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
                 + " WHERE " + timeFilter
-                + " LIMIT 1000";// FOR TEST
+                + " LIMIT 200";// FOR TEST
         try{
             ResultSet resultSet = DruidUtils.executeQuery(statement,sql);
             while(resultSet.next()){
@@ -96,7 +92,7 @@ public class DruidData {
      * @param ipList ip列表
      * @return 数据库读取结果
      */
-    public List<Map<String, Object>> readFromDruid(List<String> ipList){
+    public static List<Map<String, Object>> readFromDruid(AvaticaConnection connection,  AvaticaStatement statement, List<String> ipList, String timeFilter){
         List<Map<String, Object>> rsList = null;
         ipList = ipList.stream().map( ip -> "\'"+ip+"\'").collect(Collectors.toList());
         String ipString = "(" + StringUtils.join(ipList, ",").toString() + ")";
@@ -125,7 +121,7 @@ public class DruidData {
      * @param attackType 指定攻击类型
      * @return 筛选结果
      */
-    public List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
+    public static List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
         List<Map<String, Object>> rsList = new ArrayList<>();
         try{
             rsList = allData.stream().
@@ -141,7 +137,7 @@ public class DruidData {
      * 计算查询时间范围，可指定时间范围（测试）或使用默认配置
      * @return 时间范围起始点和终止点
      */
-    public Tuple2<Long, Long> getTimeLimit(){
+    public static Tuple2<Long, Long> getTimeLimit(){
         long maxTime = 0L;
         long minTime = 0L;
         switch(ApplicationConfig.DRUID_TIME_LIMIT_TYPE){
@@ -159,7 +155,7 @@ public class DruidData {
         return Tuple.of(maxTime, minTime);
     }
 
-    private long getCurrentDay(int bias) {
+    private static long getCurrentDay(int bias) {
         Calendar calendar = Calendar.getInstance();
         calendar.set(Calendar.DAY_OF_YEAR, calendar.get(Calendar.DAY_OF_YEAR) + bias);
         calendar.set(Calendar.HOUR_OF_DAY, 0);
@@ -170,7 +166,7 @@ public class DruidData {
         return calendar.getTimeInMillis();
     }
 
-    private long getCurrentDay(){
+    private static long getCurrentDay(){
         return getCurrentDay(0);
     }
 

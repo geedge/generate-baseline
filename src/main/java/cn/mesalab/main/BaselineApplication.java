@@ -1,7 +1,6 @@
 package cn.mesalab.main;
 
 import cn.mesalab.service.BaselineGeneration;
-import sun.rmi.runtime.Log;
 
 /**
  * @author yjy
@@ -10,6 +9,6 @@ import sun.rmi.runtime.Log;
  */
 public class BaselineApplication {
     public static void main(String[] args) {
-        BaselineGeneration.perform();
+        new BaselineGeneration().perform();
     }
 }

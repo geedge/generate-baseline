@@ -19,16 +19,19 @@ public class DruidUtils {
     private static ThreadLocal<AvaticaConnection> threadLocal = new ThreadLocal<AvaticaConnection>();
 
     private static final String DRUID_URL = ApplicationConfig.DRUID_URL;
-    private static AvaticaStatement statement = null;
 
     /**
      * 打开连接
      * @throws SQLException
      */
-    public static AvaticaConnection getConn() throws SQLException {
+    public static AvaticaConnection getConn() {
         Properties properties = new Properties();
-        properties.setProperty("connectTimeout", String.valueOf(10*60*60));
-        AvaticaConnection connection = (AvaticaConnection) DriverManager.getConnection(DRUID_URL, properties);
+        AvaticaConnection connection = null;
+        try {
+            connection = (AvaticaConnection) DriverManager.getConnection(DRUID_URL, properties);
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
         threadLocal.set(connection);
         return connection;
     }
@@ -48,8 +51,12 @@ public class DruidUtils {
      * 根据sql查询结果
      */
     public static ResultSet executeQuery (AvaticaStatement statement, String sql) throws SQLException{
-        ResultSet resultSet  = statement.executeQuery(sql);
+        ResultSet resultSet = statement.executeQuery(sql);
         return resultSet;
+    }
+
+    public static AvaticaStatement getStatement(AvaticaConnection conn) throws SQLException {
+        return conn.createStatement();
     }
 
 }
