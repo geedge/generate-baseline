@@ -158,7 +158,7 @@ public class BaselineGeneration {
 
         // 判断ip出现频率
         if(originSeries.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_RATIO){
-            // 低频率
+            // 高频率
             double percentile = StatUtils.percentile(series.stream().mapToDouble(Double::valueOf).toArray(),
                     ApplicationConfig.BASELINE_SPARSE_FILL_PERCENTILE);
             Arrays.fill(baselineArr, (int)percentile);
