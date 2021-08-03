@@ -19,6 +19,7 @@ public class DruidUtils {
     private static ThreadLocal<AvaticaConnection> threadLocal = new ThreadLocal<AvaticaConnection>();
 
     private static final String DRUID_URL = ApplicationConfig.DRUID_URL;
+    private static AvaticaStatement statement = null;
 
     /**
      * 打开连接
@@ -46,9 +47,8 @@ public class DruidUtils {
     /**
      * 根据sql查询结果
      */
-    public static ResultSet executeQuery (AvaticaConnection connection,  String sql) throws SQLException{
-        AvaticaStatement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(sql);
+    public static ResultSet executeQuery (AvaticaStatement statement, String sql) throws SQLException{
+        ResultSet resultSet  = statement.executeQuery(sql);
         return resultSet;
     }
 

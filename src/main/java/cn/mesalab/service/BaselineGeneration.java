@@ -2,7 +2,7 @@ package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
 import cn.mesalab.dao.DruidData;
-import cn.mesalab.service.BaselineService.KalmanFilter;
+import cn.mesalab.service.algorithm.KalmanFilter;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.SeriesUtils;
 import com.google.common.collect.Lists;
@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 /**
  * @author yjy
  * @version 1.0
+ * baseline生成及写入
  * @date 2021/7/23 5:38 下午
  */
 public class BaselineGeneration {
@@ -37,18 +38,22 @@ public class BaselineGeneration {
             ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD,
             ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL
     );
-    private static final Integer BASELINE_POINT_NUM = ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
+    private static final Integer BASELINE_POINT_NUM =
+            ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
+    /**
+     * 程序执行
+     */
     public static void perform() {
         long start = System.currentTimeMillis();
 
         druidData = DruidData.getInstance();
         hbaseUtils = HbaseUtils.getInstance();
         hbaseTable = hbaseUtils.getHbaseTable();
-
         LOG.info("Druid 成功建立连接");
 
         try{
+            // baseline生成并写入
             generateBaselinesThread();
 
             long last = System.currentTimeMillis();
@@ -64,10 +69,12 @@ public class BaselineGeneration {
         System.exit(0);
     }
 
+    /**
+     * 多线程baseline生成入口
+     * @throws InterruptedException
+     */
     private static void generateBaselinesThread() throws InterruptedException {
         int threadNum = Runtime.getRuntime().availableProcessors();
-//        int threadNum = 10;
-
 
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-demo-%d").build();
@@ -82,15 +89,13 @@ public class BaselineGeneration {
                 namedThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
 
-        // baseline 生成及写入
-        // 耗时测试
-        Long startQueryIPList = System.currentTimeMillis();
+        // IP列表获取
         ArrayList<String> destinationIps = druidData.getServerIpList();
-        Long endQueryIPList = System.currentTimeMillis();
 
         LOG.info("共查询到服务端ip " +destinationIps.size() + " 个");
         LOG.info("Baseline batch 大小: " + ApplicationConfig.GENERATE_BATCH_SIZE);
 
+        // 分批进行IP baseline生成和处理
         List<List<String>> batchIpLists = Lists.partition(destinationIps, ApplicationConfig.GENERATE_BATCH_SIZE);
         for (List<String> batchIps: batchIpLists){
             if(batchIps.size()>0){
@@ -102,26 +107,23 @@ public class BaselineGeneration {
         executor.awaitTermination(10L, TimeUnit.HOURS);
     }
 
+    /**
+     * 批量生成IP baseline
+     * @param ipList ip列表
+     */
     public static void generateBaselines(List<String> ipList){
-        Long startGenerationBaselines= System.currentTimeMillis();
-        Long startReadDruidData = System.currentTimeMillis();
-
+        druidData = DruidData.getInstance();
         batchDruidData = druidData.readFromDruid(ipList);
-        Long endReadDruidData = System.currentTimeMillis();
-        //LOG.info("读取Druid数据耗时："+(endReadDruidData-startReadDruidData));
 
         List<Put> putList = new ArrayList<>();
         for(String attackType: attackTypeList){
             for(String ip: ipList){
                 int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
-                if (!(ipBaseline ==null)){
+                if (ipBaseline!= null){
                     putList = hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                 }
             }
         }
-
-        Long endGenerationBaselines= System.currentTimeMillis();
-        //LOG.info("BaselineGeneration耗时："+(endGenerationBaselines-endReadDruidData));
 
         try {
             hbaseTable.put(putList);
@@ -130,25 +132,27 @@ public class BaselineGeneration {
             e.printStackTrace();
         }
 
-        Long endWriteTime = System.currentTimeMillis();
-        //LOG.info("BaselineWriteIn耗时："+(endWriteTime-endGenerationBaselines));
+        druidData.closeConn();
     }
 
+    /**
+     * 单ip baseline生成逻辑
+     * @param ip ip
+     * @param attackType 攻击类型
+     * @return baseline序列，长度为 60/HISTORICAL_GRAD*24
+     */
     private static int[] generateSingleIpBaseline(String ip, String attackType){
         // 查询
-        Long startQuerySingleIPTime = System.currentTimeMillis();
         List<Map<String, Object>> originSeries = druidData.getTimeSeriesData(batchDruidData, ip, attackType);
 
         if (originSeries.size()==0){
             return null;
         }
 
-        Long endQuerySingleIPTime = System.currentTimeMillis();
-
         // 时间序列缺失值补0
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(originSeries);
 
-        int[] baselineArr = new int[completSeries.size()];
+        int[] baselineArr = new int[BASELINE_POINT_NUM];
         List<Integer>series = completSeries.stream().map(
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
 
@@ -173,14 +177,14 @@ public class BaselineGeneration {
             }
         }
 
-        Long endGenerateSingleIPTime = System.currentTimeMillis();
-        //LOG.info("性能测试：单个baseline生成耗时——"+(endGenerateSingleIPTime-endQuerySingleIPTime));
-        //System.out.println(ip);
-        //System.out.println(attackType + Arrays.toString(baselineArr));
-
         return baselineArr;
     }
 
+    /**
+     * baseline 生成算法
+     * @param timeSeries 输入序列
+     * @return 输出序列
+     */
     private static int[] baselineFunction(List<Integer> timeSeries){
         int[] result;
         switch (ApplicationConfig.BASELINE_FUNCTION){

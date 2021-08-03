@@ -1,4 +1,4 @@
-package cn.mesalab.service.BaselineService;
+package cn.mesalab.service.algorithm;
 
 import cn.mesalab.config.ApplicationConfig;
 
@@ -8,12 +8,11 @@ import java.util.List;
 /**
  * @author yjy
  * @version 1.0
+ * kalman滤波器
  * @date 2021/7/25 1:42 下午
  */
 
 public class KalmanFilter {
-
-    /**Kalman Filter*/
     private Integer predict;
     private Integer current;
     private Integer estimate;
@@ -29,6 +28,7 @@ public class KalmanFilter {
     }
 
     public void initial(){
+        // TODO 调整
         pdelt = 1;
         mdelt = 1;
     }
@@ -54,9 +54,7 @@ public class KalmanFilter {
 
 
     public void forcast(List<Integer> historicalSeries, Integer length){
-        // 初始值计算
         int oldvalue = (historicalSeries.stream().mapToInt(Integer::intValue).sum())/historicalSeries.size();
-        // 滤波
         smoothSeries = new ArrayList<Integer>();
         for(int i = 0; i < historicalSeries.size(); i++){
             int value = historicalSeries.get(i);
