@@ -2,10 +2,12 @@ package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
 import cn.mesalab.dao.DruidData;
+import cn.mesalab.dao.ReadHistoricalDruidData;
 import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.vavr.Tuple2;
 import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
 import org.apache.hadoop.hbase.client.Table;
@@ -47,10 +49,13 @@ public class BaselineGeneration {
     private static final Integer BASELINE_POINT_NUM =
             ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
+    private static Tuple2<Long, Long> startEndTimes = DruidData.getTimeLimit();
     private static String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " >= MILLIS_TO_TIMESTAMP(" + DruidData.getTimeLimit()._2
+            + " >= MILLIS_TO_TIMESTAMP(" + startEndTimes._2
             + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " < MILLIS_TO_TIMESTAMP(" + DruidData.getTimeLimit()._1 + ")";
+            + " < MILLIS_TO_TIMESTAMP(" + startEndTimes._1 + ")";
+
+    private static ArrayList<Map<String, Object>> allFromDruid = new ArrayList<>();
 
     /**
      * 程序执行
@@ -80,23 +85,47 @@ public class BaselineGeneration {
      * @throws InterruptedException
      */
     private void generateBaselinesThread() throws InterruptedException {
-        int threadNum = Runtime.getRuntime().availableProcessors();
+        int threadNum = ApplicationConfig.THREAD_MAX_NUM;
 
-        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder()
-                .setNameFormat("baseline-demo-%d").build();
-
-        // 创建线程池
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                threadNum,
-                threadNum,
-                0L,
-                TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(1024),
-                namedThreadFactory,
+        // 数据读取
+        LOG.info("Druid 开始读取数据");
+        long start = System.currentTimeMillis();
+        // allFromDruid = DruidData.readAllFromDruid(druidConn, druidStatement, timeFilter);
+        ThreadFactory loadDataThreadFactory = new ThreadFactoryBuilder()
+                .setNameFormat("baseline-load-data-%d").build();
+        ThreadPoolExecutor loadDataExecutor = new ThreadPoolExecutor(
+                threadNum, threadNum, 0L,
+                TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), loadDataThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
+        long timeGrad = (startEndTimes._1 - startEndTimes._2)/threadNum;
+        for (int i = 0; i < threadNum; i++) {
+            String sql = DruidData.getDruidQuerySql(startEndTimes._1, i, timeGrad);
+            ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
+                    sql,
+                    druidStatement
+            );
+            Future<List<Map<String, Object>>> future = loadDataExecutor.submit(readHistoricalDruidData);
+            try {
+                allFromDruid.addAll(future.get());
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+        long last = System.currentTimeMillis();
+        LOG.info("Druid 加载数据共耗时："+(last-start));
+        loadDataExecutor.shutdown();
+        loadDataExecutor.awaitTermination(10L, TimeUnit.HOURS);
 
-        // IP列表获取
-        ArrayList<String> destinationIps = DruidData.getServerIpList(druidStatement, timeFilter);
+
+        // BaseLine生成
+        // 获取IP列表
+        List<String> destinationIps = DruidData.getServerIpList(allFromDruid);
+        ThreadFactory generationThreadFactory = new ThreadFactoryBuilder()
+                .setNameFormat("baseline-load-data-%d").build();
+        ThreadPoolExecutor generationExecutor = new ThreadPoolExecutor(
+                threadNum, threadNum, 0L,
+                TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), generationThreadFactory,
+                new ThreadPoolExecutor.AbortPolicy());
 
         LOG.info("共查询到服务端ip " +destinationIps.size() + " 个");
         LOG.info("Baseline batch 大小: " + ApplicationConfig.GENERATE_BATCH_SIZE);
@@ -106,21 +135,22 @@ public class BaselineGeneration {
 
         for (List<String> batchIps: batchIpLists){
             if(batchIps.size()>0){
-                BaselineSingleThread testForInsider = new BaselineSingleThread(
+                BaselineSingleThread baselineSingleThread = new BaselineSingleThread(
                         batchIps,
                         druidConn,
                         druidStatement,
                         hbaseTable,
                         attackTypeList,
                         BASELINE_POINT_NUM,
-                        timeFilter
+                        timeFilter,
+                        allFromDruid
                 );
-                executor.execute(testForInsider);
+                generationExecutor.execute(baselineSingleThread);
             }
         }
 
-        executor.shutdown();
-        executor.awaitTermination(10L, TimeUnit.HOURS);
+        generationExecutor.shutdown();
+        generationExecutor.awaitTermination(10L, TimeUnit.HOURS);
     }
 
 }

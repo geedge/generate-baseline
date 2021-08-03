@@ -50,6 +50,8 @@ public class ApplicationConfig {
     public static final Integer LOG_WRITE_COUNT = ConfigUtils.getIntProperty("log.write.count");
     public static final Integer GENERATE_BATCH_SIZE = ConfigUtils.getIntProperty("generate.batch.size");
 
+    public static final Integer THREAD_MAX_NUM = ConfigUtils.getIntProperty("thread.max.num");
+
 
 
     // http config

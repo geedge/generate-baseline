@@ -13,10 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -87,6 +84,14 @@ public class DruidData {
         return serverIps;
     }
 
+    public static List<String> getServerIpList(List<Map<String, Object>> dataFromDruid) {
+        List<String> serverIps = new ArrayList<>();
+        List<String> collect = dataFromDruid.stream().map(i -> i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).toString())
+                .collect(Collectors.toList());
+        serverIps = collect.stream().distinct().collect(Collectors.toList());
+        return serverIps;
+    }
+
     /**
      * 从Druid读取目标IP相关数据
      * @param ipList ip列表
@@ -113,6 +118,29 @@ public class DruidData {
         }
         return rsList;
     }
+
+    public static List<Map<String, Object>> readFromDruid(String sql, AvaticaStatement statement){
+        List<Map<String, Object>> rsList = null;
+        try{
+            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
+            ResultSetToListService service  = new ResultSetToListServiceImp();
+            rsList = service.selectAll(resultSet);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return rsList;
+    }
+
+    public static List<Map<String, Object>> getBatchData(List<Map<String, Object>>allData, List<String> ipList){
+        ArrayList<Map<String, Object>> rsList = new ArrayList<>();
+        for(Map<String, Object> record: allData){
+            if(ipList.contains(record.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME))){
+                rsList.add(record);
+            }
+        }
+        return rsList;
+    }
+
 
     /**
      * 从数据库读取结果中筛选指定ip的指定攻击类型的数据
@@ -180,4 +208,22 @@ public class DruidData {
             exception.printStackTrace();
         }
     }
+
+    public static String getDruidQuerySql(Long originBeginTime, int currentPart, long timeGrad){
+        long startTime = originBeginTime +  currentPart * timeGrad;
+        long endTime = originBeginTime +  (currentPart+1) * timeGrad;
+        String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " >= MILLIS_TO_TIMESTAMP(" + startTime
+                + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " < MILLIS_TO_TIMESTAMP(" + endTime + ")";
+
+        String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
+                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
+                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " FROM " + ApplicationConfig.DRUID_TABLE
+                + " WHERE " + timeFilter; // FOR TEST
+        return sql;
+    }
+
 }

@@ -36,6 +36,7 @@ public class BaselineSingleThread extends Thread {
     private Integer BASELINE_POINT_NUM;
     private String timeFilter;
     private List<Map<String, Object>> batchDruidData;
+    private List<Map<String, Object>> historicalData;
 
     public BaselineSingleThread(
             List<String> batchIpList,
@@ -44,7 +45,8 @@ public class BaselineSingleThread extends Thread {
             Table hbaseTable,
             List<String> attackTypeList,
             Integer BASELINE_POINT_NUM,
-            String timeFilter
+            String timeFilter,
+            List<Map<String, Object>> historicalData
     ){
         this.ipList = batchIpList;
         this.druidConn = druidConn;
@@ -53,11 +55,13 @@ public class BaselineSingleThread extends Thread {
         this.attackTypeList = attackTypeList;
         this.BASELINE_POINT_NUM = BASELINE_POINT_NUM;
         this.timeFilter = timeFilter;
+        this.historicalData = historicalData;
     }
 
     @Override
     public void run(){
-        batchDruidData = DruidData.readFromDruid(druidConn, druidStatement, ipList, timeFilter);
+//        batchDruidData = DruidData.readFromDruid(druidConn, druidStatement, ipList, timeFilter);
+        batchDruidData = DruidData.getBatchData(historicalData, ipList);
 
         List<Put> putList = new ArrayList<>();
         for(String attackType: attackTypeList){
