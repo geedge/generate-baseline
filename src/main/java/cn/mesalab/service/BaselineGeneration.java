@@ -121,7 +121,7 @@ public class BaselineGeneration {
         // 获取IP列表
         List<String> destinationIps = DruidData.getServerIpList(allFromDruid);
         ThreadFactory generationThreadFactory = new ThreadFactoryBuilder()
-                .setNameFormat("baseline-load-data-%d").build();
+                .setNameFormat("baseline-generate-%d").build();
         ThreadPoolExecutor generationExecutor = new ThreadPoolExecutor(
                 threadNum, threadNum, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), generationThreadFactory,

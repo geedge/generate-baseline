@@ -20,7 +20,6 @@ public class KalmanFilter {
     private double mdelt;
     private double Gauss;
     private double kalmanGain;
-    private final static double Q = ApplicationConfig.BASELINE_KALMAN_Q;
     private final static double R = ApplicationConfig.BASELINE_KALMAN_R;
 
     public KalmanFilter() {
@@ -28,9 +27,7 @@ public class KalmanFilter {
     }
 
     public void initial(){
-        // TODO 调整
-        pdelt = 1;
-        mdelt = 1;
+        pdelt = ApplicationConfig.BASELINE_KALMAN_P;
     }
 
     private ArrayList<Integer> smoothSeries;
@@ -40,20 +37,18 @@ public class KalmanFilter {
         //第一个估计值
         predict = oldValue;
         current = value;
-        //高斯噪声方差
-        Gauss = Math.sqrt(pdelt * pdelt + mdelt * mdelt) + Q;
         //估计方差
-        kalmanGain = Math.sqrt((Gauss * Gauss)/(Gauss * Gauss + pdelt * pdelt)) + R;
+        kalmanGain = pdelt/(pdelt + R);
         //估计值
         estimate = (int) (kalmanGain * (current - predict) + predict);
         //新的估计方差
-        mdelt = Math.sqrt((1-kalmanGain) * Gauss * Gauss);
+        mdelt = (1-kalmanGain) * pdelt ;
 
         return estimate;
     }
 
-
     public void forcast(List<Integer> historicalSeries, Integer length){
+        // 滤波
         int oldvalue = (historicalSeries.stream().mapToInt(Integer::intValue).sum())/historicalSeries.size();
         smoothSeries = new ArrayList<Integer>();
         for(int i = 0; i < historicalSeries.size(); i++){
@@ -62,6 +57,7 @@ public class KalmanFilter {
             smoothSeries.add(oldvalue);
         }
 
+        // 平均
         forecastSeries = new ArrayList<>();
         Integer partitonNum = historicalSeries.size()/length;
         for(int i = 0; i<length; i++){
