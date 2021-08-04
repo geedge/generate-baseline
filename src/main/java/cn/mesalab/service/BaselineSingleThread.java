@@ -74,7 +74,7 @@ public class BaselineSingleThread extends Thread {
         }
         try {
             hbaseTable.put(putList);
-            LOG.info("Baseline 线程 " +  Thread.currentThread().getId() + " 成功写入Baseline条数共计 " + putList.size());
+            LOG.info(" 成功写入Baseline条数共计 " + putList.size());
         } catch (IOException e) {
             e.printStackTrace();
         }

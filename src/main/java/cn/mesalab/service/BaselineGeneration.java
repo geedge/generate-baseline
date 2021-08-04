@@ -27,7 +27,7 @@ import java.util.concurrent.*;
 public class BaselineGeneration {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineGeneration.class);
 
-    private static AvaticaConnection druidConn = DruidUtils.getConn();
+    private static final AvaticaConnection druidConn = DruidUtils.getConn();
     private static AvaticaStatement druidStatement;
 
     static {
@@ -38,9 +38,9 @@ public class BaselineGeneration {
         }
     }
 
-    private static Table hbaseTable = HbaseUtils.getInstance().getHbaseTable();
+    private static final Table hbaseTable = HbaseUtils.getInstance().getHbaseTable();
 
-    private static List<String> attackTypeList = Arrays.asList(
+    private static final List<String> ATTACK_TYPE_LIST = Arrays.asList(
             ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD,
             ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD,
             ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD,
@@ -49,13 +49,13 @@ public class BaselineGeneration {
     private static final Integer BASELINE_POINT_NUM =
             ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
-    private static Tuple2<Long, Long> startEndTimes = DruidData.getTimeLimit();
-    private static String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " >= MILLIS_TO_TIMESTAMP(" + startEndTimes._2
+    private static final Tuple2<Long, Long> START_END_TIMES = DruidData.getTimeLimit();
+    private static final String TIME_FILTER = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+            + " >= MILLIS_TO_TIMESTAMP(" + START_END_TIMES._2
             + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-            + " < MILLIS_TO_TIMESTAMP(" + startEndTimes._1 + ")";
+            + " < MILLIS_TO_TIMESTAMP(" + START_END_TIMES._1 + ")";
 
-    private static ArrayList<Map<String, Object>> allFromDruid = new ArrayList<>();
+    private static final ArrayList<Map<String, Object>> allFromDruid = new ArrayList<>();
 
     /**
      * 程序执行
@@ -90,27 +90,35 @@ public class BaselineGeneration {
         // 数据读取
         LOG.info("Druid 开始读取数据");
         long start = System.currentTimeMillis();
-        // allFromDruid = DruidData.readAllFromDruid(druidConn, druidStatement, timeFilter);
         ThreadFactory loadDataThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-load-data-%d").build();
         ThreadPoolExecutor loadDataExecutor = new ThreadPoolExecutor(
                 threadNum, threadNum, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), loadDataThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
-        long timeGrad = (startEndTimes._1 - startEndTimes._2)/threadNum;
-        for (int i = 0; i < threadNum; i++) {
-            String sql = DruidData.getDruidQuerySql(startEndTimes._1, i, timeGrad);
+        long timeGrad = 3600000 * ApplicationConfig.DRUID_READ_BATCH_TIME_GRAD_HOUR;
+        ArrayList<Future<ArrayList<Map<String, Object>>>> resultList = new ArrayList<>();
+        for (int i = 0; i < (START_END_TIMES._1-START_END_TIMES._2)/timeGrad; i++) {
+            String sql = DruidData.getDruidQuerySql(START_END_TIMES._1, i, timeGrad);
             ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
                     sql,
                     druidStatement
             );
-            Future<List<Map<String, Object>>> future = loadDataExecutor.submit(readHistoricalDruidData);
+            Future<ArrayList<Map<String, Object>>> future = loadDataExecutor.submit(readHistoricalDruidData);
+            resultList.add(future);
+        }
+        for(Future<ArrayList<Map<String, Object>>> future: resultList){
             try {
-                allFromDruid.addAll(future.get());
+                if(future.get()!=null){
+                    allFromDruid.addAll(future.get());
+                }else{
+                    LOG.error("future.get()未获取到结果");
+                }
             } catch (ExecutionException e) {
                 e.printStackTrace();
             }
         }
+
         long last = System.currentTimeMillis();
         LOG.info("Druid 加载数据共耗时："+(last-start));
         loadDataExecutor.shutdown();
@@ -128,10 +136,10 @@ public class BaselineGeneration {
                 new ThreadPoolExecutor.AbortPolicy());
 
         LOG.info("共查询到服务端ip " +destinationIps.size() + " 个");
-        LOG.info("Baseline batch 大小: " + ApplicationConfig.GENERATE_BATCH_SIZE);
+        LOG.info("Baseline batch 大小: " + ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
 
         // 分批进行IP baseline生成和处理
-        List<List<String>> batchIpLists = Lists.partition(destinationIps, ApplicationConfig.GENERATE_BATCH_SIZE);
+        List<List<String>> batchIpLists = Lists.partition(destinationIps, ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
 
         for (List<String> batchIps: batchIpLists){
             if(batchIps.size()>0){
@@ -140,9 +148,9 @@ public class BaselineGeneration {
                         druidConn,
                         druidStatement,
                         hbaseTable,
-                        attackTypeList,
+                        ATTACK_TYPE_LIST,
                         BASELINE_POINT_NUM,
-                        timeFilter,
+                        TIME_FILTER,
                         allFromDruid
                 );
                 generationExecutor.execute(baselineSingleThread);
