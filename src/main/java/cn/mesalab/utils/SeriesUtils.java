@@ -188,22 +188,5 @@ public class SeriesUtils {
         int index = (int) Math.ceil(percentile * latencies.size());
         return latencies.get(index-1);
     }
-
-    public static void main(String[] args) {
-        List<Integer> test = Arrays.asList(
-                1,2,3,4,5,
-                1,2,3,4,5,
-                1,2,3,4,5,
-                1,2,3,4,5,
-                1,2,3,4,5,
-                1,2,3,4,5,
-                1,2,3,4,5);
-        System.out.println(columnAverage(Lists.partition(test, 5)));
-
-
-
-    }
-
-
 }
 
