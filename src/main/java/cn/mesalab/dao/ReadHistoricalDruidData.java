@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * @author yjy
@@ -19,11 +20,14 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
     private static final Logger LOG = LoggerFactory.getLogger(ReadHistoricalDruidData.class);
 
     private String sql;
+    private CountDownLatch countDownLatch;
 
     public ReadHistoricalDruidData(
-            String sql
+            String sql,
+            CountDownLatch countDownLatch
     ){
         this.sql = sql;
+        this.countDownLatch = countDownLatch;
     }
 
     @Override
@@ -34,12 +38,18 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
             AvaticaConnection connection = DruidUtils.getConn();
             AvaticaStatement stat = connection.createStatement();
             resultData.addAll(DruidData.readFromDruid(sql, stat));
+
+
+
             long end = System.currentTimeMillis();
             LOG.info(sql + "\n读取" + resultData.size() + "条数据，运行时间：" + (end - start));
             connection.close();
             stat.close();
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            countDownLatch.countDown();
+            LOG.info("本线程读取完毕，剩余线程数量：" + countDownLatch.getCount());
         }
         return resultData;
     }

@@ -85,15 +85,21 @@ public class BaselineGeneration {
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), loadDataThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
         long timeGrad = 3600000 * ApplicationConfig.DRUID_READ_BATCH_TIME_GRAD_HOUR;
+        int threadPoolNum = (int) ((START_END_TIMES._1-START_END_TIMES._2)/timeGrad);
         ArrayList<Future<ArrayList<Map<String, Object>>>> resultList = new ArrayList<>();
-        for (int i = 0; i < (START_END_TIMES._1-START_END_TIMES._2)/timeGrad; i++) {
+        CountDownLatch loadDataCountDownLatch = new CountDownLatch(threadPoolNum);
+        for (int i = 0; i < threadNum; i++) {
             String sql = DruidData.getDruidQuerySql(START_END_TIMES._1, i, timeGrad);
             ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
-                    sql
+                    sql,
+                    loadDataCountDownLatch
             );
             Future<ArrayList<Map<String, Object>>> future = loadDataExecutor.submit(readHistoricalDruidData);
             resultList.add(future);
         }
+        loadDataExecutor.shutdown();
+        loadDataCountDownLatch.await();
+
         for(Future<ArrayList<Map<String, Object>>> future: resultList){
             try {
                 if(future.get()!=null){
@@ -105,12 +111,8 @@ public class BaselineGeneration {
                 e.printStackTrace();
             }
         }
-
         long last = System.currentTimeMillis();
         LOG.info("Druid 加载数据共耗时："+(last-start));
-        loadDataExecutor.shutdown();
-        loadDataExecutor.awaitTermination(10L, TimeUnit.HOURS);
-
 
         // BaseLine生成
         // 获取IP列表
@@ -127,7 +129,7 @@ public class BaselineGeneration {
 
         // 分批进行IP baseline生成和处理
         List<List<String>> batchIpLists = Lists.partition(destinationIps, ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
-
+        CountDownLatch generateCountDownLatch = new CountDownLatch(threadPoolNum);
         for (List<String> batchIps: batchIpLists){
             if(batchIps.size()>0){
                 BaselineSingleThread baselineSingleThread = new BaselineSingleThread(
@@ -136,14 +138,14 @@ public class BaselineGeneration {
                         ATTACK_TYPE_LIST,
                         BASELINE_POINT_NUM,
                         TIME_FILTER,
-                        allFromDruid
+                        allFromDruid,
+                        generateCountDownLatch
                 );
                 generationExecutor.execute(baselineSingleThread);
             }
         }
-
         generationExecutor.shutdown();
-        generationExecutor.awaitTermination(10L, TimeUnit.HOURS);
+        generateCountDownLatch.await();
     }
 
 }

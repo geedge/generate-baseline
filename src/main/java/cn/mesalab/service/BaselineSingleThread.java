@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +36,7 @@ public class BaselineSingleThread extends Thread {
     private String timeFilter;
     private List<Map<String, Object>> batchDruidData;
     private List<Map<String, Object>> historicalData;
+    private CountDownLatch countDownLatch;
 
     public BaselineSingleThread(
             List<String> batchIpList,
@@ -42,7 +44,8 @@ public class BaselineSingleThread extends Thread {
             List<String> attackTypeList,
             Integer BASELINE_POINT_NUM,
             String timeFilter,
-            List<Map<String, Object>> historicalData
+            List<Map<String, Object>> historicalData,
+            CountDownLatch countDownLatch
     ){
         this.ipList = batchIpList;
         this.hbaseTable = hbaseTable;
@@ -50,6 +53,7 @@ public class BaselineSingleThread extends Thread {
         this.BASELINE_POINT_NUM = BASELINE_POINT_NUM;
         this.timeFilter = timeFilter;
         this.historicalData = historicalData;
+        this.countDownLatch = countDownLatch;
     }
 
     @Override
@@ -70,6 +74,9 @@ public class BaselineSingleThread extends Thread {
             LOG.info(" 成功写入Baseline条数共计 " + putList.size());
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            countDownLatch.countDown();
+            LOG.info("本线程读取完毕，剩余线程数量：" + countDownLatch.getCount());
         }
     }
 
