@@ -95,11 +95,13 @@ public class BaselineSingleThread extends Thread {
             Arrays.fill(baselineArr, (int)percentile);
             // KF
             baselineArr = baselineFunction(series);
+            System.out.println("高频IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
         } else {
             // 判断周期性
             if (SeriesUtils.isPeriod(series)){
                 // KF
                 baselineArr = baselineFunction(series);
+                System.out.println("低频周期IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
             } else {
                 // 百分位数
                 int ipPercentile = SeriesUtils.percentile(
@@ -107,6 +109,7 @@ public class BaselineSingleThread extends Thread {
                                 Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList()),
                         ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
                 Arrays.fill(baselineArr, ipPercentile);
+                System.out.println("其他IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
             }
         }
 

@@ -21,6 +21,7 @@ public class KalmanFilter {
     private double mdelt;
     private double Gauss;
     private double kalmanGain;
+    private final static double Q = ApplicationConfig.BASELINE_KALMAN_Q;
     private final static double R = ApplicationConfig.BASELINE_KALMAN_R;
 
     public KalmanFilter() {
@@ -29,21 +30,23 @@ public class KalmanFilter {
 
     public void initial(){
         pdelt = ApplicationConfig.BASELINE_KALMAN_P;
+        mdelt = ApplicationConfig.BASELINE_KALMAN_M;
     }
 
     private ArrayList<Integer> smoothSeries;
     private ArrayList<Integer> forecastSeries;
 
     public Integer calSingleKalPoint(Integer oldValue, Integer value){
-        //第一个估计值
         predict = oldValue;
         current = value;
+        //高斯噪声方差
+        Gauss = Math.sqrt(pdelt * pdelt + mdelt * mdelt) + Q;
         //估计方差
-        kalmanGain = pdelt/(pdelt + R);
+        kalmanGain = Math.sqrt((Gauss * Gauss)/(Gauss * Gauss + pdelt * pdelt)) + R;
         //估计值
         estimate = (int) (kalmanGain * (current - predict) + predict);
         //新的估计方差
-        mdelt = (1-kalmanGain) * pdelt ;
+        mdelt = Math.sqrt((1-kalmanGain) * Gauss * Gauss);
 
         return estimate;
     }
@@ -68,6 +71,9 @@ public class KalmanFilter {
             }
             forecastSeries.add((int)sum/partitonNum);
         }
+
+        System.out.println("KF test: origin:" + historicalSeries + "\n smooth:" + smoothSeries + "\n baseline:" + forecastSeries);
+
     }
 
     public ArrayList<Integer> getSmoothSeries() {
