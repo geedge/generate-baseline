@@ -35,7 +35,6 @@ public class BaselineGeneration {
 
     private static final Tuple2<Long, Long> START_END_TIMES = DruidData.getTimeLimit();
     private static final Map<String, List<Map<String, Object>>> allFromDruid = new HashMap<>();
-    private static int threadNum = ApplicationConfig.THREAD_MAX_NUM;
 
     /**
      * 程序执行
@@ -65,19 +64,19 @@ public class BaselineGeneration {
         long start = System.currentTimeMillis();
 
         long timeGrad = 3600000 * ApplicationConfig.DRUID_READ_BATCH_TIME_GRAD_HOUR;
-        int threadPoolNum = (int) ((START_END_TIMES._2-START_END_TIMES._1)/timeGrad);
+        int loadDataThreadPoolNum = (int) ((START_END_TIMES._2-START_END_TIMES._1)/timeGrad);
         ArrayList<Future<Map<String, List<Map<String, Object>>>>> resultList = new ArrayList<>();
-        CountDownLatch loadDataCountDownLatch = new CountDownLatch(threadPoolNum);
+        CountDownLatch loadDataCountDownLatch = new CountDownLatch(loadDataThreadPoolNum);
 
         ThreadFactory loadDataThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-load-data-%d").build();
         ThreadPoolExecutor loadDataExecutor = new ThreadPoolExecutor(
-                threadNum, threadNum, 0L,
+                loadDataThreadPoolNum, loadDataThreadPoolNum, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), loadDataThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
 
         // 按ip数分区
-        for (int i = 0; i < threadPoolNum; i++) {
+        for (int i = 0; i < loadDataThreadPoolNum; i++) {
             String sql = DruidData.getDruidQuerySql(ATTACK_TYPE_LIST, START_END_TIMES._1, i, timeGrad);
             ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
                     sql,
@@ -115,17 +114,19 @@ public class BaselineGeneration {
      * @throws InterruptedException
      */
     private static void baselineGenration() throws InterruptedException {
+        List<Map<String, List<Map<String, Object>>>> batchDruidDataLists = DruidData.splitMap(allFromDruid, ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
+        int generationThreadPoolNum = batchDruidDataLists.size();
+        CountDownLatch generateCountDownLatch = new CountDownLatch(generationThreadPoolNum);
+
         ThreadFactory generationThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-generate-%d").build();
         ThreadPoolExecutor generationExecutor = new ThreadPoolExecutor(
-                threadNum, threadNum, 0L,
+                generationThreadPoolNum, generationThreadPoolNum, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), generationThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
 
         LOG.info("Baseline batch 大小: " + ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
 
-        List<Map<String, List<Map<String, Object>>>> batchDruidDataLists = DruidData.splitMap(allFromDruid, ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
-        CountDownLatch generateCountDownLatch = new CountDownLatch(batchDruidDataLists.size());
         for (Map<String, List<Map<String, Object>>>batchDruidData: batchDruidDataLists){
             if(batchDruidData.size()>0){
                 BaselineSingleThread baselineSingleThread = new BaselineSingleThread(

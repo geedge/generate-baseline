@@ -49,7 +49,7 @@ public class ApplicationConfig {
 
     public static final Integer BASELINE_GENERATE_BATCH_SIZE = ConfigUtils.getIntProperty("baseline.generate.batch.size");
     public static final Long DRUID_READ_BATCH_TIME_GRAD_HOUR = ConfigUtils.getLongProperty("druid.read.batch.time.grad.hour");
-    public static final Integer THREAD_MAX_NUM = ConfigUtils.getIntProperty("thread.max.num");
+    public static final Integer THREAD_POOL_NUM = ConfigUtils.getIntProperty("thread.pool.num");
 
     // http config
     public static final Integer HTTP_REQUEST_TIMEOUT = ConfigUtils.getIntProperty("http.request.timeout");
