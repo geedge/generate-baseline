@@ -29,8 +29,6 @@ public class BaselineSingleThread extends Thread {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineSingleThread.class);
 
     private List<String> ipList;
-    private AvaticaConnection druidConn;
-    private AvaticaStatement druidStatement;
     private Table hbaseTable;
     private List<String> attackTypeList;
     private Integer BASELINE_POINT_NUM;
