@@ -27,17 +27,6 @@ import java.util.concurrent.*;
 public class BaselineGeneration {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineGeneration.class);
 
-    private static final AvaticaConnection druidConn = DruidUtils.getConn();
-    private static AvaticaStatement druidStatement;
-
-    static {
-        try {
-            druidStatement = DruidUtils.getStatement(druidConn);
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-    }
-
     private static final Table hbaseTable = HbaseUtils.getInstance().getHbaseTable();
 
     private static final List<String> ATTACK_TYPE_LIST = Arrays.asList(
@@ -70,7 +59,6 @@ public class BaselineGeneration {
             long last = System.currentTimeMillis();
             LOG.warn("运行时间:" + (last - start));
 
-            druidConn.close();
             hbaseTable.close();
             LOG.info("Druid 关闭连接");
 
@@ -101,8 +89,7 @@ public class BaselineGeneration {
         for (int i = 0; i < (START_END_TIMES._1-START_END_TIMES._2)/timeGrad; i++) {
             String sql = DruidData.getDruidQuerySql(START_END_TIMES._1, i, timeGrad);
             ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
-                    sql,
-                    druidStatement
+                    sql
             );
             Future<ArrayList<Map<String, Object>>> future = loadDataExecutor.submit(readHistoricalDruidData);
             resultList.add(future);
@@ -145,8 +132,6 @@ public class BaselineGeneration {
             if(batchIps.size()>0){
                 BaselineSingleThread baselineSingleThread = new BaselineSingleThread(
                         batchIps,
-                        druidConn,
-                        druidStatement,
                         hbaseTable,
                         ATTACK_TYPE_LIST,
                         BASELINE_POINT_NUM,

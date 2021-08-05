@@ -19,14 +19,11 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
     private static final Logger LOG = LoggerFactory.getLogger(ReadHistoricalDruidData.class);
 
     private String sql;
-    private AvaticaStatement statement;
 
     public ReadHistoricalDruidData(
-            String sql,
-            AvaticaStatement statement
+            String sql
     ){
         this.sql = sql;
-        this.statement = statement;
     }
 
     @Override
@@ -40,7 +37,7 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
             long end = System.currentTimeMillis();
             LOG.info(sql + "\n读取" + resultData.size() + "条数据，运行时间：" + (end - start));
             connection.close();
-            statement.close();
+            stat.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
