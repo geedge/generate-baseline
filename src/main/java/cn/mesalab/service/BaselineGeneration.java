@@ -24,7 +24,6 @@ public class BaselineGeneration {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineGeneration.class);
 
     private static final Table hbaseTable = HbaseUtils.getInstance().getHbaseTable();
-
     private static final List<String> ATTACK_TYPE_LIST = Arrays.asList(
             ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD
 //            ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD,
@@ -36,6 +35,7 @@ public class BaselineGeneration {
 
     private static final Tuple2<Long, Long> START_END_TIMES = DruidData.getTimeLimit();
     private static final Map<String, List<Map<String, Object>>> allFromDruid = new HashMap<>();
+    private static int threadNum = ApplicationConfig.THREAD_MAX_NUM;
 
     /**
      * 程序执行
@@ -44,41 +44,39 @@ public class BaselineGeneration {
         long start = System.currentTimeMillis();
 
         try{
-            // baseline生成并写入
-            generateBaselinesThread();
-
-            long last = System.currentTimeMillis();
-            LOG.warn("运行时间:" + (last - start));
-
+            loadFromDruid();
+            baselineGenration();
             hbaseTable.close();
-            LOG.info("Druid 关闭连接");
-
         } catch (Exception e){
             e.printStackTrace();
+        } finally {
+            long last = System.currentTimeMillis();
+            LOG.warn("运行时间:" + (last - start));
         }
         System.exit(0);
     }
 
     /**
-     * 多线程baseline生成入口
+     * Druid数据读取
      * @throws InterruptedException
      */
-    private void generateBaselinesThread() throws InterruptedException {
-        int threadNum = ApplicationConfig.THREAD_MAX_NUM;
-
-        // 数据读取
-        LOG.info("Druid 开始读取数据");
+    private void loadFromDruid() throws InterruptedException {
+        LOG.info("开始读取数据");
         long start = System.currentTimeMillis();
+
+        long timeGrad = 3600000 * ApplicationConfig.DRUID_READ_BATCH_TIME_GRAD_HOUR;
+        int threadPoolNum = (int) ((START_END_TIMES._2-START_END_TIMES._1)/timeGrad);
+        ArrayList<Future<Map<String, List<Map<String, Object>>>>> resultList = new ArrayList<>();
+        CountDownLatch loadDataCountDownLatch = new CountDownLatch(threadPoolNum);
+
         ThreadFactory loadDataThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-load-data-%d").build();
         ThreadPoolExecutor loadDataExecutor = new ThreadPoolExecutor(
                 threadNum, threadNum, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), loadDataThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
-        long timeGrad = 3600000 * ApplicationConfig.DRUID_READ_BATCH_TIME_GRAD_HOUR;
-        int threadPoolNum = (int) ((START_END_TIMES._2-START_END_TIMES._1)/timeGrad);
-        ArrayList<Future<Map<String, List<Map<String, Object>>>>> resultList = new ArrayList<>();
-        CountDownLatch loadDataCountDownLatch = new CountDownLatch(threadPoolNum);
+
+        // 按ip数分区
         for (int i = 0; i < threadPoolNum; i++) {
             String sql = DruidData.getDruidQuerySql(ATTACK_TYPE_LIST, START_END_TIMES._1, i, timeGrad);
             ReadHistoricalDruidData readHistoricalDruidData = new ReadHistoricalDruidData(
@@ -91,6 +89,7 @@ public class BaselineGeneration {
         loadDataExecutor.shutdown();
         loadDataCountDownLatch.await();
 
+        // 返回结果合并
         for(Future<Map<String, List<Map<String, Object>>>> future: resultList){
             try {
                 Map<String, List<Map<String, Object>>> queryBatchIpData = future.get();
@@ -104,10 +103,18 @@ public class BaselineGeneration {
                 e.printStackTrace();
             }
         }
+        LOG.info("本次共查询到服务端ip个数：" +allFromDruid.size());
+        LOG.info("查询范围： " + START_END_TIMES._1 + " - " + START_END_TIMES._2);
+
         long last = System.currentTimeMillis();
         LOG.info("Druid 加载数据共耗时："+(last-start));
+    }
 
-        // BaseLine生成
+    /**
+     * Baseline生成及写入
+     * @throws InterruptedException
+     */
+    private static void baselineGenration() throws InterruptedException {
         ThreadFactory generationThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-generate-%d").build();
         ThreadPoolExecutor generationExecutor = new ThreadPoolExecutor(
@@ -115,9 +122,7 @@ public class BaselineGeneration {
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), generationThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
 
-        LOG.info("共查询到服务端ip " +allFromDruid.size() + " 个");
         LOG.info("Baseline batch 大小: " + ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
-
 
         List<Map<String, List<Map<String, Object>>>> batchDruidDataLists = DruidData.splitMap(allFromDruid, ApplicationConfig.BASELINE_GENERATE_BATCH_SIZE);
         CountDownLatch generateCountDownLatch = new CountDownLatch(batchDruidDataLists.size());

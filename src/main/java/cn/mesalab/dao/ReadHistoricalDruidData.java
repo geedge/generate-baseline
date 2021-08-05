@@ -42,7 +42,7 @@ public class ReadHistoricalDruidData implements Callable<Map<String, List<Map<St
             resultData.putAll(readFromDruid);
 
             long end = System.currentTimeMillis();
-            LOG.info(sql + "\n读取" + resultData.size() + "条数据，运行时间：" + (end - start));
+            LOG.info("\n获取" + resultData.size() + " Server IP数据，运行时间：" + (end - start));
             connection.close();
             stat.close();
         } catch (Exception e) {

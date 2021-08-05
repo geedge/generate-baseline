@@ -63,12 +63,11 @@ public class BaselineSingleThread extends Thread {
         }
         try {
             hbaseTable.put(putList);
-            LOG.info(" 成功写入Baseline条数共计 " + putList.size());
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             countDownLatch.countDown();
-            LOG.info("本线程处理完毕，剩余线程数量：" + countDownLatch.getCount());
+            LOG.info("成功写入Baseline条数共计 " + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
         }
     }
 
