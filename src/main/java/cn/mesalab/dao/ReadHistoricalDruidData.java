@@ -39,6 +39,8 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
             resultData.addAll(DruidData.readFromDruid(sql, stat));
             long end = System.currentTimeMillis();
             LOG.info(sql + "\n读取" + resultData.size() + "条数据，运行时间：" + (end - start));
+            connection.close();
+            statement.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
