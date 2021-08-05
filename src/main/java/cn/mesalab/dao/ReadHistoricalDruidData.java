@@ -6,7 +6,8 @@ import org.apache.calcite.avatica.AvaticaStatement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -16,11 +17,11 @@ import java.util.concurrent.CountDownLatch;
  * @version 1.0
  * @date 2021/8/3 8:10 下午
  */
-public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, Object>>> {
+public class ReadHistoricalDruidData implements Callable<Map<String, List<Map<String, Object>>>> {
     private static final Logger LOG = LoggerFactory.getLogger(ReadHistoricalDruidData.class);
 
-    private String sql;
-    private CountDownLatch countDownLatch;
+    private final String sql;
+    private final CountDownLatch countDownLatch;
 
     public ReadHistoricalDruidData(
             String sql,
@@ -31,15 +32,14 @@ public class ReadHistoricalDruidData implements Callable<ArrayList<Map<String, O
     }
 
     @Override
-    public ArrayList<Map<String, Object>> call() {
-        ArrayList<Map<String, Object>> resultData = new ArrayList<>();
+    public Map<String, List<Map<String, Object>>> call() {
+        Map<String, List<Map<String, Object>>> resultData = new HashMap<>();
         try {
             long start = System.currentTimeMillis();
             AvaticaConnection connection = DruidUtils.getConn();
             AvaticaStatement stat = connection.createStatement();
-            resultData.addAll(DruidData.readFromDruid(sql, stat));
-
-
+            Map<String, List<Map<String, Object>>> readFromDruid = DruidData.readFromDruid(sql, stat);
+            resultData.putAll(readFromDruid);
 
             long end = System.currentTimeMillis();
             LOG.info(sql + "\n读取" + resultData.size() + "条数据，运行时间：" + (end - start));

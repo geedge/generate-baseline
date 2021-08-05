@@ -1,18 +1,16 @@
 package cn.mesalab.dao;
 
 import cn.mesalab.config.ApplicationConfig;
-import cn.mesalab.dao.Impl.ResultSetToListServiceImp;
 import cn.mesalab.utils.DruidUtils;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
-import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.ResultSetMetaData;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,139 +24,51 @@ import java.util.stream.Collectors;
 public class DruidData {
 
     private static final Logger LOG = LoggerFactory.getLogger(DruidData.class);
-    private static DruidData druidData;
-    private AvaticaConnection connection;
-    private AvaticaStatement statement;
 
-
-    {
-        connectionInit();
+    public static Map<String, List<Map<String, Object>>> readFromDruid(String sql, AvaticaStatement statement){
+        Map<String, List<Map<String, Object>>> rsList = null;
+        try{
+            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
+            rsList = selectAll(resultSet);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return rsList;
     }
 
     /**
-     * 连接初始化
+     * 处理Druid读取返回数据为Map<String, List<Map<String, Object>>>形式
+     * 外层map key为ip，内层map的key为ip的一条日志
+     * @param rs
+     * @return
      */
-    private void connectionInit(){
+    public static Map<String, List<Map<String, Object>>> selectAll(ResultSet rs) {
+        Map<String, List<Map<String, Object>>> allIpDataList = new HashMap<>();
+        ArrayList<String> ipList = new ArrayList<>();
+
         try {
-            connection = DruidUtils.getConn();
-            statement = connection.createStatement();
-            statement.setQueryTimeout(0);
+            ResultSetMetaData rmd = rs.getMetaData();
+            int columnCount = rmd.getColumnCount();
 
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-    }
+            while (rs.next()) {
+                Map<String, Object> rowData = new HashMap<>();
+                for (int i = 1; i <= columnCount; ++i) {
+                    rowData.put(rmd.getColumnName(i), rs.getObject(i));
+                }
 
-    /**
-     * 获取实例
-     * @return DruidData实例
-     */
-    public static DruidData getInstance() {
-        druidData = new DruidData();
-        return druidData;
-    }
-
-    /**
-     * 获取distinct server ip
-     * @return ArrayList<String> ip列表
-     */
-    public static ArrayList<String> getServerIpList(AvaticaStatement statement, String timeFilter) {
-        Long startQueryIpLIstTime = System.currentTimeMillis();
-        ArrayList<String> serverIps = new ArrayList<String>();
-        String sql = "SELECT distinct " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + timeFilter
-                + " LIMIT 200";// FOR TEST
-        try{
-            ResultSet resultSet = DruidUtils.executeQuery(statement,sql);
-            while(resultSet.next()){
-                String ip = resultSet.getString(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
-                serverIps.add(ip);
+                String ip = (String) rowData.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
+                if(!ipList.contains(ip)){
+                    ipList.add(ip);
+                    List<Map<String, Object>> ipData = new ArrayList<>();
+                    allIpDataList.put(ip, ipData);
+                }
+                rowData.remove(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
+                allIpDataList.get(ip).add(rowData);
             }
-        } catch (Exception e){
-            e.printStackTrace();
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        Long endQueryIpListTime = System.currentTimeMillis();
-        LOG.info("性能测试：ip list查询耗时——"+(endQueryIpListTime-startQueryIpLIstTime));
-
-        return serverIps;
-    }
-
-    public static List<String> getServerIpList(List<Map<String, Object>> dataFromDruid) {
-        List<String> serverIps = new ArrayList<>();
-        List<String> collect = dataFromDruid.stream().map(i -> i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).toString())
-                .collect(Collectors.toList());
-        serverIps = collect.stream().distinct().collect(Collectors.toList());
-        return serverIps;
-    }
-
-    /**
-     * 从Druid读取目标IP相关数据
-     * @param ipList ip列表
-     * @return 数据库读取结果
-     */
-    public static List<Map<String, Object>> readFromDruid(AvaticaConnection connection,  AvaticaStatement statement, List<String> ipList, String timeFilter){
-        List<Map<String, Object>> rsList = null;
-        ipList = ipList.stream().map( ip -> "\'"+ip+"\'").collect(Collectors.toList());
-        String ipString = "(" + StringUtils.join(ipList, ",").toString() + ")";
-        String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
-                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-                + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + " IN " + ipString
-                + " AND " + timeFilter;
-        try{
-            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
-            ResultSetToListService service  = new ResultSetToListServiceImp();
-            rsList = service.selectAll(resultSet);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-        return rsList;
-    }
-
-    public static List<Map<String, Object>> readFromDruid(String sql, AvaticaStatement statement){
-        List<Map<String, Object>> rsList = null;
-        try{
-            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
-            ResultSetToListService service  = new ResultSetToListServiceImp();
-            rsList = service.selectAll(resultSet);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-        return rsList;
-    }
-
-    public static List<Map<String, Object>> getBatchData(List<Map<String, Object>>allData, List<String> ipList){
-        ArrayList<Map<String, Object>> rsList = new ArrayList<>();
-        for(Map<String, Object> record: allData){
-            if(ipList.contains(record.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME))){
-                rsList.add(record);
-            }
-        }
-        return rsList;
-    }
-
-
-    /**
-     * 从数据库读取结果中筛选指定ip的指定攻击类型的数据
-     * @param allData 数据库读取结果
-     * @param ip 指定ip
-     * @param attackType 指定攻击类型
-     * @return 筛选结果
-     */
-    public static List<Map<String, Object>> getTimeSeriesData(List<Map<String, Object>> allData, String ip, String attackType){
-        List<Map<String, Object>> rsList = new ArrayList<>();
-        try{
-            rsList = allData.stream().
-                    filter(i->((i.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME).equals(ip))
-                            )&&(i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType)))
-                    .collect(Collectors.toList());
-        } catch (NullPointerException e){
-        }
-        return rsList;
+        return allIpDataList;
     }
 
     /**
@@ -180,7 +90,7 @@ public class DruidData {
             default:
                 LOG.warn("没有设置Druid数据读取方式");
         }
-        return Tuple.of(maxTime, minTime);
+        return Tuple.of(minTime, maxTime);
     }
 
     private static long getCurrentDay(int bias) {
@@ -198,32 +108,46 @@ public class DruidData {
         return getCurrentDay(0);
     }
 
-    /**
-     * 关闭当前DruidData
-     */
-    public void closeConn(){
-        try {
-            DruidUtils.closeConnection();
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-    }
 
-    public static String getDruidQuerySql(Long originBeginTime, int currentPart, long timeGrad){
+    public static String getDruidQuerySql(List<String> attackTypeList, Long originBeginTime, int currentPart, long timeGrad){
         long startTime = originBeginTime +  currentPart * timeGrad;
         long endTime = originBeginTime +  (currentPart+1) * timeGrad;
+        attackTypeList = attackTypeList.stream().map(attack -> "'"+attack+"'").collect(Collectors.toList());
+        String attackList = "(" + StringUtils.join(attackTypeList, ",") + ")";
         String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " >= MILLIS_TO_TIMESTAMP(" + startTime
                 + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " < MILLIS_TO_TIMESTAMP(" + endTime + ")";
 
-        String sql = "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+        return "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
                 + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
                 + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + timeFilter; // FOR TEST
-        return sql;
+                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
+                + " IN " + attackList
+                + " AND " + timeFilter;
     }
 
+    /**
+     * 描述：分割Map
+     * @param map 原始数据
+     * @param pageSize 每个map数量
+     * @return ListList<Map<K, V>>
+     */
+    public static <K, V> List<Map<K, V>> splitMap(Map<K, V> map, int pageSize){
+        if(map == null || map.isEmpty()){
+            return Collections.emptyList();
+        }
+        List<Map<K, V>> newList = new ArrayList<>();
+        int j = 0;
+        for(K k :map.keySet()){
+            if(j%pageSize == 0) {
+                newList.add(new HashMap<>());
+            }
+            newList.get(newList.size()-1).put(k, map.get(k));
+            j++;
+        }
+        return newList;
+    }
 }

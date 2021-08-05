@@ -1,12 +1,9 @@
 package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
-import cn.mesalab.dao.DruidData;
 import cn.mesalab.service.algorithm.KalmanFilter;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.SeriesUtils;
-import org.apache.calcite.avatica.AvaticaConnection;
-import org.apache.calcite.avatica.AvaticaStatement;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
@@ -29,43 +26,38 @@ import java.util.stream.Collectors;
 public class BaselineSingleThread extends Thread {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineSingleThread.class);
 
-    private List<String> ipList;
-    private Table hbaseTable;
-    private List<String> attackTypeList;
-    private Integer BASELINE_POINT_NUM;
-    private String timeFilter;
-    private List<Map<String, Object>> batchDruidData;
-    private List<Map<String, Object>> historicalData;
-    private CountDownLatch countDownLatch;
+    private final Table hbaseTable;
+    private final List<String> attackTypeList;
+    private final Integer historicalPointNum;
+    private final Map<String,List<Map<String, Object>>> batchDruidData;
+    private final CountDownLatch countDownLatch;
 
     public BaselineSingleThread(
-            List<String> batchIpList,
             Table hbaseTable,
             List<String> attackTypeList,
-            Integer BASELINE_POINT_NUM,
-            String timeFilter,
-            List<Map<String, Object>> historicalData,
+            Integer baselinePointNum,
+            Map<String,List<Map<String, Object>>> batchDruidData,
             CountDownLatch countDownLatch
     ){
-        this.ipList = batchIpList;
         this.hbaseTable = hbaseTable;
         this.attackTypeList = attackTypeList;
-        this.BASELINE_POINT_NUM = BASELINE_POINT_NUM;
-        this.timeFilter = timeFilter;
-        this.historicalData = historicalData;
+        this.historicalPointNum = baselinePointNum;
+        this.batchDruidData = batchDruidData;
         this.countDownLatch = countDownLatch;
     }
 
     @Override
     public void run(){
-        batchDruidData = DruidData.getBatchData(historicalData, ipList);
-
         List<Put> putList = new ArrayList<>();
         for(String attackType: attackTypeList){
-            for(String ip: ipList){
-                int[] ipBaseline = generateSingleIpBaseline(ip, attackType);
+            for(String ip: batchDruidData.keySet()){
+                // 筛选指定ip指定攻击类型的数据
+                List<Map<String, Object>> ipDruidData = batchDruidData.get(ip).stream()
+                        .filter(i -> i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType)).collect(Collectors.toList());
+                // baseline生成
+                int[] ipBaseline = generateSingleIpBaseline(ipDruidData);
                 if (ipBaseline!= null){
-                    putList = HbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
+                    HbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                 }
             }
         }
@@ -76,46 +68,40 @@ public class BaselineSingleThread extends Thread {
             e.printStackTrace();
         } finally {
             countDownLatch.countDown();
-            LOG.info("本线程读取完毕，剩余线程数量：" + countDownLatch.getCount());
+            LOG.info("本线程处理完毕，剩余线程数量：" + countDownLatch.getCount());
         }
     }
 
     /**
      * 单ip baseline生成逻辑
-     * @param ip ip
-     * @param attackType 攻击类型
      * @return baseline序列，长度为 60/HISTORICAL_GRAD*24
      */
-    private int[] generateSingleIpBaseline(String ip, String attackType){
-        // 查询
-        List<Map<String, Object>> originSeries = DruidData.getTimeSeriesData(batchDruidData, ip, attackType);
-
-        if (originSeries.size()==0){
+    private int[] generateSingleIpBaseline(List<Map<String, Object>> ipDruidData){
+        if (ipDruidData.size()==0){
             return null;
         }
 
         // 时间序列缺失值补0
-        List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(originSeries);
+        List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(ipDruidData);
 
-        int[] baselineArr = new int[BASELINE_POINT_NUM];
+        int[] baselineArr = new int[historicalPointNum];
         List<Integer>series = completSeries.stream().map(
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
 
         // 判断ip出现频率
-        if(originSeries.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_RATIO){
+        if(ipDruidData.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_RATIO){
             // 高频率
             double percentile = StatUtils.percentile(series.stream().mapToDouble(Double::valueOf).toArray(),
                     ApplicationConfig.BASELINE_SPARSE_FILL_PERCENTILE);
             Arrays.fill(baselineArr, (int)percentile);
             baselineArr = baselineFunction(series);
-
         } else {
             // 判断周期性
             if (SeriesUtils.isPeriod(series)){
                 baselineArr = baselineFunction(series);
             } else {
                 int ipPercentile = SeriesUtils.percentile(
-                        originSeries.stream().map(i ->
+                        ipDruidData.stream().map(i ->
                                 Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList()),
                         ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
                 Arrays.fill(baselineArr, ipPercentile);
@@ -135,11 +121,11 @@ public class BaselineSingleThread extends Thread {
         switch (ApplicationConfig.BASELINE_FUNCTION){
             case "KalmanFilter":
                 KalmanFilter kalmanFilter = new KalmanFilter();
-                kalmanFilter.forcast(timeSeries, BASELINE_POINT_NUM);
+                kalmanFilter.forcast(timeSeries, historicalPointNum);
                 result = kalmanFilter.getForecastSeries().stream().mapToInt(Integer::valueOf).toArray();
                 break;
             default:
-                result = timeSeries.subList(0, BASELINE_POINT_NUM).stream().mapToInt(Integer::valueOf).toArray();
+                result = timeSeries.subList(0, historicalPointNum).stream().mapToInt(Integer::valueOf).toArray();
         }
         return result;
     }

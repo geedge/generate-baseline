@@ -50,9 +50,9 @@ public class SeriesUtils {
      * 时序数据补齐
      */
     public static List<Map<String, Object>> complementSeries(List<Map<String, Object>> originSeries){
-        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(druidData.getTimeLimit()._2), TimeZone
+        LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(DruidData.getTimeLimit()._1), TimeZone
                 .getDefault().toZoneId());
-        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(druidData.getTimeLimit()._1), TimeZone
+        LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(DruidData.getTimeLimit()._2), TimeZone
                 .getDefault().toZoneId());
         List<String> dateList = completionDate(startTime, endTime);
 

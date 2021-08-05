@@ -51,8 +51,6 @@ public class ApplicationConfig {
     public static final Long DRUID_READ_BATCH_TIME_GRAD_HOUR = ConfigUtils.getLongProperty("druid.read.batch.time.grad.hour");
     public static final Integer THREAD_MAX_NUM = ConfigUtils.getIntProperty("thread.max.num");
 
-
-
     // http config
     public static final Integer HTTP_REQUEST_TIMEOUT = ConfigUtils.getIntProperty("http.request.timeout");
     public static final Integer HTTP_RESPONSE_TIMEOUT = ConfigUtils.getIntProperty("http.response.timeout");
