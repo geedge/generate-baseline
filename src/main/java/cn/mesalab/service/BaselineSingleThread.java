@@ -88,11 +88,15 @@ public class BaselineSingleThread extends Thread {
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
 
         // 判断ip出现频率
-        if(ipDruidData.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_RATIO){
+        if(ipDruidData.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD){
             // 异常值剔除
-            double percentile = StatUtils.percentile(series.stream().mapToDouble(Double::valueOf).toArray(),
-                    ApplicationConfig.BASELINE_SPARSE_FILL_PERCENTILE);
-            Arrays.fill(baselineArr, (int)percentile);
+            double exceptionPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXECEPTION_PERCENTILE);
+            double exceptionFillPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXCECPTION_FILL_PERCENTILE);
+            for(int i=0; i<series.size(); i++){
+                if(series.get(i) > exceptionPercentile){
+                    series.set(i, (int) exceptionFillPercentile);
+                }
+            }
             // KF
             baselineArr = baselineFunction(series);
             // System.out.println("高频IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
