@@ -72,7 +72,7 @@ public class KalmanFilter {
             forecastSeries.add((int)sum/partitonNum);
         }
 
-        System.out.println("KF test: origin:" + historicalSeries + "\n smooth:" + smoothSeries + "\n baseline:" + forecastSeries);
+        //System.out.println("KF test: origin:" + historicalSeries + "\n smooth:" + smoothSeries + "\n baseline:" + forecastSeries);
 
     }
 

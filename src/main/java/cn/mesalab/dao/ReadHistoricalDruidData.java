@@ -42,14 +42,15 @@ public class ReadHistoricalDruidData implements Callable<Map<String, List<Map<St
             resultData.putAll(readFromDruid);
 
             long end = System.currentTimeMillis();
-            LOG.info("\n获取" + resultData.size() + " Server IP数据，运行时间：" + (end - start));
+            LOG.info("获取Server IP：" + resultData.size() +
+                    "   运行时间：" + (end - start) +
+                    "   剩余线程数量：" + countDownLatch.getCount()) ;
             connection.close();
             stat.close();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             countDownLatch.countDown();
-            LOG.info("本线程读取完毕，剩余线程数量：" + countDownLatch.getCount());
         }
         return resultData;
     }
