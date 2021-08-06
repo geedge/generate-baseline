@@ -63,17 +63,14 @@ public class KalmanFilter {
 
         // 平均
         forecastSeries = new ArrayList<>();
-        Integer partitonNum = historicalSeries.size()/length;
+        int partitionNum = historicalSeries.size()/length;
         for(int i = 0; i<length; i++){
             long sum = 0;
-            for (int period=0; period<partitonNum; period++){
+            for (int period=0; period<partitionNum; period++){
                 sum += smoothSeries.get(length*period+i);
             }
-            forecastSeries.add((int)sum/partitonNum);
+            forecastSeries.add((int)sum/partitionNum);
         }
-
-        //System.out.println("KF test: origin:" + historicalSeries + "\n smooth:" + smoothSeries + "\n baseline:" + forecastSeries);
-
     }
 
     public ArrayList<Integer> getSmoothSeries() {
