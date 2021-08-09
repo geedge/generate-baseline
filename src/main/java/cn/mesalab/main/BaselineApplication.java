@@ -9,6 +9,6 @@ import cn.mesalab.service.BaselineGeneration;
  */
 public class BaselineApplication {
     public static void main(String[] args) {
-        new BaselineGeneration().perform();
+        BaselineGeneration.perform();
     }
 }

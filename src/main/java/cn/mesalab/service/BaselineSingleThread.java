@@ -1,9 +1,14 @@
 package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
+import cn.mesalab.dao.DruidData;
 import cn.mesalab.service.algorithm.KalmanFilter;
+import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.SeriesUtils;
+import org.apache.calcite.avatica.AvaticaClientRuntimeException;
+import org.apache.calcite.avatica.AvaticaConnection;
+import org.apache.calcite.avatica.AvaticaStatement;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
@@ -11,10 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
@@ -26,28 +28,41 @@ import java.util.stream.Collectors;
 public class BaselineSingleThread extends Thread {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineSingleThread.class);
 
+    private final HbaseUtils hbaseUtils;
     private final Table hbaseTable;
     private final List<String> attackTypeList;
     private final Integer baselinePointNum;
-    private final Map<String,List<Map<String, Object>>> batchDruidData;
+    private final int batchPartitionRange;
+    private final int currentBatch;
     private final CountDownLatch countDownLatch;
 
     public BaselineSingleThread(
-            Table hbaseTable,
             List<String> attackTypeList,
-            Integer baselinePointNum,
-            Map<String,List<Map<String, Object>>> batchDruidData,
+            int baselinePointNum,
+            int batchPartitionRange,
+            int currentBatch,
             CountDownLatch countDownLatch
     ){
-        this.hbaseTable = hbaseTable;
+        hbaseUtils = HbaseUtils.getInstance();
+
+        this.hbaseTable = hbaseUtils.getHbaseTable();
         this.attackTypeList = attackTypeList;
         this.baselinePointNum = baselinePointNum;
-        this.batchDruidData = batchDruidData;
+        this.batchPartitionRange = batchPartitionRange;
+        this.currentBatch = currentBatch;
         this.countDownLatch = countDownLatch;
     }
 
     @Override
     public void run(){
+        long start = System.currentTimeMillis();
+        // 数据读取
+        LOG.info("开始数据读取");
+        Map<String, List<Map<String, Object>>> batchDruidData = getBatchDruidData();
+        LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
+                "   运行时间：" + (System.currentTimeMillis()- start));
+
+        // 基线生成
         List<Put> putList = new ArrayList<>();
         for(String attackType: attackTypeList){
             for(String ip: batchDruidData.keySet()){
@@ -57,7 +72,7 @@ public class BaselineSingleThread extends Thread {
                 // baseline生成
                 int[] ipBaseline = generateSingleIpBaseline(ip, ipDruidData);
                 if (ipBaseline!= null){
-                    HbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
+                   hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                 }
             }
         }
@@ -66,9 +81,25 @@ public class BaselineSingleThread extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
+            hbaseUtils.close();
             countDownLatch.countDown();
             LOG.info("成功写入Baseline条数共计 " + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
         }
+    }
+
+    private Map<String, List<Map<String, Object>>> getBatchDruidData() {
+        Map<String, List<Map<String, Object>>> readFromDruid = new HashMap<>();
+        try {
+            AvaticaConnection connection = DruidUtils.getConn();
+            AvaticaStatement stat = connection.createStatement();
+            String sql = DruidData.getBatchDruidQuerySql(attackTypeList, currentBatch, batchPartitionRange);
+            readFromDruid = DruidData.readFromDruid(sql, stat);
+            connection.close();
+            stat.close();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return readFromDruid;
     }
 
     /**

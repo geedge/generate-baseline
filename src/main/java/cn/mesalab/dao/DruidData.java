@@ -109,7 +109,7 @@ public class DruidData {
     }
 
 
-    public static String getDruidQuerySql(List<String> attackTypeList, Long originBeginTime, int currentPart, long timeGrad){
+    public static String getBatchDruidQuerySql(List<String> attackTypeList, Long originBeginTime, int currentPart, long timeGrad){
         long startTime = originBeginTime +  currentPart * timeGrad;
         long endTime = originBeginTime +  (currentPart+1) * timeGrad;
         attackTypeList = attackTypeList.stream().map(attack -> "'"+attack+"'").collect(Collectors.toList());
@@ -127,6 +127,26 @@ public class DruidData {
                 + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
                 + " IN " + attackList
                 + " AND " + timeFilter;
+    }
+
+    public static String getBatchDruidQuerySql(List<String> attackTypeList, int currentPart, int partitionNumGrad){
+        int startPartitionNum = currentPart * partitionNumGrad;
+        int endPartitionNum = (currentPart + 1) * partitionNumGrad;
+        attackTypeList = attackTypeList.stream().map(attack -> "'"+attack+"'").collect(Collectors.toList());
+        String attackList = "(" + StringUtils.join(attackTypeList, ",") + ")";
+        String partitionFilter = ApplicationConfig.DRUID_COLUMNNAME_PARTITION_NUM
+                + " >= " + startPartitionNum
+                + " AND " + ApplicationConfig.DRUID_COLUMNNAME_PARTITION_NUM
+                + " < " + endPartitionNum;
+
+        return "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
+                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
+                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " FROM " + ApplicationConfig.DRUID_TABLE
+                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
+                + " IN " + attackList
+                + " AND " + partitionFilter;
     }
 
     /**
