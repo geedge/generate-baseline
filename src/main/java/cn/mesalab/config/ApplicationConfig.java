@@ -59,6 +59,8 @@ public class ApplicationConfig {
     public static final Integer THREAD_POOL_NUM = ConfigUtils.getIntProperty("thread.pool.num");
     public static final Integer PARTITION_NUM_MAX = ConfigUtils.getIntProperty("druid.partition.num.max");
 
+    public static final Integer DRUID_CONNECTION_RETRY_TIME_MAX = ConfigUtils.getIntProperty("druid.connection.retry.time.max");
+    public static final Integer DRUID_CONNECTION_RETRY_SLEEP_TIME = ConfigUtils.getIntProperty("druid.connection.retry.sleep.time");
 
 }
 

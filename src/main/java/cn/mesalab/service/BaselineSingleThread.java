@@ -5,6 +5,7 @@ import cn.mesalab.dao.DruidData;
 import cn.mesalab.service.algorithm.KalmanFilter;
 import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
+import cn.mesalab.utils.RetryUtils;
 import cn.mesalab.utils.SeriesUtils;
 import org.apache.calcite.avatica.AvaticaClientRuntimeException;
 import org.apache.calcite.avatica.AvaticaConnection;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
@@ -53,12 +55,26 @@ public class BaselineSingleThread extends Thread {
         this.countDownLatch = countDownLatch;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void run(){
         long start = System.currentTimeMillis();
         // 数据读取
         LOG.info("开始数据读取");
-        Map<String, List<Map<String, Object>>> batchDruidData = getBatchDruidData();
+        Map<String, List<Map<String, Object>>> batchDruidData = new HashMap<>();
+        // Druid retry
+        try {
+            batchDruidData = (Map<String, List<Map<String, Object>>>) new RetryUtils() {
+                @Override
+                protected Object toTry(){
+                    return getBatchDruidData();
+                }
+            }.setRetryTime(ApplicationConfig.DRUID_CONNECTION_RETRY_TIME_MAX)
+                    .setSleepTime(ApplicationConfig.DRUID_CONNECTION_RETRY_SLEEP_TIME).execute();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
                 "   运行时间：" + (System.currentTimeMillis()- start));
 
@@ -71,7 +87,7 @@ public class BaselineSingleThread extends Thread {
                         .filter(i -> i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType)).collect(Collectors.toList());
                 // baseline生成
                 int[] ipBaseline = generateSingleIpBaseline(ip, ipDruidData);
-                if (ipBaseline!= null){
+                if ((ipBaseline!= null ) && (ip.length()>0)){
                    hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                 }
             }
@@ -96,7 +112,7 @@ public class BaselineSingleThread extends Thread {
             readFromDruid = DruidData.readFromDruid(sql, stat);
             connection.close();
             stat.close();
-        } catch (Exception e){
+        } catch (SQLException e){
             e.printStackTrace();
         }
         return readFromDruid;
