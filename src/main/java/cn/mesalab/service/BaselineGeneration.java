@@ -24,10 +24,10 @@ public class BaselineGeneration {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineGeneration.class);
 
     private static final List<String> ATTACK_TYPE_LIST = Arrays.asList(
-            ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD
-//            ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD,
-//            ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD,
-//            ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL
+            ApplicationConfig.DRUID_ATTACKTYPE_TCP_SYN_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_ICMP_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_UDP_FLOOD,
+            ApplicationConfig.DRUID_ATTACKTYPE_DNS_AMPL
             );
     private static final Integer BASELINE_POINT_NUM =
             ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
@@ -77,9 +77,4 @@ public class BaselineGeneration {
         generationExecutor.shutdown();
         generateCountDownLatch.await();
     }
-
-    public static void main(String[] args) {
-        perform();
-    }
-
 }
