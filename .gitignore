@@ -43,3 +43,4 @@ log/
 logs/
 
 */META-INF/*
+*/test/*
