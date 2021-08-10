@@ -7,6 +7,8 @@ import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.RetryUtils;
 import cn.mesalab.utils.SeriesUtils;
+import io.vavr.Tuple;
+import io.vavr.Tuple2;
 import org.apache.calcite.avatica.AvaticaClientRuntimeException;
 import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
@@ -86,9 +88,15 @@ public class BaselineSingleThread extends Thread {
                 List<Map<String, Object>> ipDruidData = batchDruidData.get(ip).stream()
                         .filter(i -> i.get(ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME).equals(attackType)).collect(Collectors.toList());
                 // baseline生成
-                int[] ipBaseline = generateSingleIpBaseline(ip, ipDruidData);
-                if ((ipBaseline!= null ) && (ip.length()>0)){
-                   hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
+                Tuple2<int[], Integer> tuple = generateSingleIpBaseline(ip, ipDruidData);
+                if(tuple!=null){
+                    int[] ipBaseline = tuple._1;
+                    int generateType = tuple._2;
+                    if ((ipBaseline!= null ) && (ip.length()>0)){
+                        hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
+                        hbaseUtils.cachedInPut(putList, ip, generateType, attackType,
+                                ApplicationConfig.BASELINE_METRIC_TYPE + "_" + ApplicationConfig.HBASE_BASELINE_GENERATION_TYPE_SUFFIX);
+                    }
                 }
             }
         }
@@ -119,24 +127,36 @@ public class BaselineSingleThread extends Thread {
     }
 
     /**
-     * 单ip baseline生成逻辑
+     *
      * @return baseline序列，长度为 60/HISTORICAL_GRAD*24
      */
-    private int[] generateSingleIpBaseline(String ip, List<Map<String, Object>> ipDruidData){
+    /**
+     * 单ip baseline生成逻辑
+     * @param ip
+     * @param ipDruidData
+     * @return baseline序列，长度为 60/HISTORICAL_GRAD*24;
+     *         baselineGenerationType:
+     *          1: 高频IP
+     *          2: 低频有周期IP
+     *          3：其他类型IP, 采用百分位阈值基线
+     */
+    private Tuple2<int[], Integer> generateSingleIpBaseline(String ip, List<Map<String, Object>> ipDruidData){
         if (ipDruidData.size()==0){
             return null;
         }
 
+        int baselineGenerationType = 0;
+        int[] baselineArr = new int[baselinePointNum];
+
         // 时间序列缺失值补0
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(ipDruidData);
-
-        int[] baselineArr = new int[baselinePointNum];
         List<Integer>series = completSeries.stream().map(
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
 
         // 判断ip出现频率
         if(ipDruidData.size()/(float)completSeries.size()>ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD){
             // 异常值剔除
+            baselineGenerationType = 1;
             double exceptionPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXECEPTION_PERCENTILE);
             double exceptionFillPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXCECPTION_FILL_PERCENTILE);
             for(int i=0; i<series.size(); i++){
@@ -146,25 +166,24 @@ public class BaselineSingleThread extends Thread {
             }
             // KF
             baselineArr = baselineFunction(series);
-            // System.out.println("高频IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
         } else {
             // 判断周期性
             if (SeriesUtils.isPeriod(series)){
+                baselineGenerationType = 2;
                 // KF
                 baselineArr = baselineFunction(series);
-                // System.out.println("低频周期IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
             } else {
+                baselineGenerationType = 3;
                 // 百分位数
                 int ipPercentile = SeriesUtils.percentile(
                         ipDruidData.stream().map(i ->
                                 Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList()),
                         ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
                 Arrays.fill(baselineArr, ipPercentile);
-                // System.out.println("其他IP:" + ip + " origin:" + series + "\n baseline:" + Arrays.toString(baselineArr));
             }
         }
 
-        return baselineArr;
+        return new Tuple2<>(baselineArr, baselineGenerationType);
     }
 
     /**
