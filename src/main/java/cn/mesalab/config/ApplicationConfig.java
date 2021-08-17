@@ -24,6 +24,7 @@ public class ApplicationConfig {
     public static final String BASELINE_METRIC_TYPE = ConfigUtils.getStringProperty("baseline.metric.type");
 
     public static final String HBASE_BASELINE_GENERATION_TYPE_SUFFIX = ConfigUtils.getStringProperty("hbase.baseline.generation.type.suffix");
+    public static final String HBASE_BASELINE_ZERO_REPLACE_VALUE_SUFFIX = ConfigUtils.getStringProperty("hbase.baseline.zero.replace.value.suffix");
 
     public static final String DRUID_ATTACKTYPE_TCP_SYN_FLOOD = ConfigUtils.getStringProperty("druid.attacktype.tcpsynflood");
     public static final String DRUID_ATTACKTYPE_UDP_FLOOD = ConfigUtils.getStringProperty("druid.attacktype.udpflood");
@@ -40,7 +41,7 @@ public class ApplicationConfig {
     public static final Float BASELINE_HISTORICAL_FREQUENCY_THREAD = ConfigUtils.getFloatProperty("baseline.historical.frequency.thread");
     // 异常值判断分位数
     public static final Float BASELINE_EXECEPTION_PERCENTILE = ConfigUtils.getFloatProperty("baseline.exception.percentile");
-    // 异常值替换百分位
+    // 异常值百分位数
     public static final Float BASELINE_EXCECPTION_FILL_PERCENTILE = ConfigUtils.getFloatProperty("baseline.exception.fill.percentile");
     public static final String BASELINE_FUNCTION = ConfigUtils.getStringProperty("baseline.function");
     public static final Integer BASELINE_RANGE_DAYS = ConfigUtils.getIntProperty("baseline.range.days");
