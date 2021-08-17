@@ -143,21 +143,24 @@ public class BaselineSingleThread extends Thread {
         if (ipDruidData.size()==0){
             return null;
         }
-
         List<Integer> originSeries = ipDruidData.stream().map(i ->
                 Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
         if(Collections.max(originSeries)==0){
             return null;
         }
 
-        int baselineGenerationType = 0;
+        int ipPercentile = SeriesUtils.percentile(originSeries, ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
+        if(ipPercentile == 0){
+            LOG.error(ip + "-" + "IP zero-replace value is 0 !");
+        }
+
+        int baselineGenerationType;
         int[] baselineArr = new int[baselinePointNum];
 
         // 时间序列缺失值补0
         List<Map<String, Object>> completSeries = SeriesUtils.complementSeries(ipDruidData);
         List<Integer>series = completSeries.stream().map(
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
-        int ipPercentile = SeriesUtils.percentile(originSeries, ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
 
         // 判断ip出现频率
         float ipFrequency = ipDruidData.size() / (float) completSeries.size();
