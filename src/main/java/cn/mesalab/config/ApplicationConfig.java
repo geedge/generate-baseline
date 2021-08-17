@@ -65,5 +65,7 @@ public class ApplicationConfig {
     public static final Integer DRUID_CONNECTION_RETRY_TIME_MAX = ConfigUtils.getIntProperty("druid.connection.retry.time.max");
     public static final Integer DRUID_CONNECTION_RETRY_SLEEP_TIME = ConfigUtils.getIntProperty("druid.connection.retry.sleep.time");
 
+    public static final Integer MONITOR_FREQUENCY_BIN_NUM = ConfigUtils.getIntProperty("monitor.frequency.bin.num");
+
 }
 

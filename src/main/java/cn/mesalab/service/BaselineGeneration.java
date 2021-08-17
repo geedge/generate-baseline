@@ -49,7 +49,7 @@ public class BaselineGeneration {
             e.printStackTrace();
         } finally {
             long last = System.currentTimeMillis();
-            LOG.warn("运行时间:" + (last - start));
+            LOG.info("运行时间:" + (last - start));
         }
         System.exit(0);
     }

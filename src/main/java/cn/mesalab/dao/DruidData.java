@@ -109,27 +109,9 @@ public class DruidData {
     }
 
 
-    public static String getBatchDruidQuerySql(List<String> attackTypeList, Long originBeginTime, int currentPart, long timeGrad){
-        long startTime = originBeginTime +  currentPart * timeGrad;
-        long endTime = originBeginTime +  (currentPart+1) * timeGrad;
-        attackTypeList = attackTypeList.stream().map(attack -> "'"+attack+"'").collect(Collectors.toList());
-        String attackList = "(" + StringUtils.join(attackTypeList, ",") + ")";
-        String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-                + " >= MILLIS_TO_TIMESTAMP(" + startTime
-                + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-                + " < MILLIS_TO_TIMESTAMP(" + endTime + ")";
-
-        return "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
-                + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
-                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
-                + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + " IN " + attackList
-                + " AND " + timeFilter;
-    }
-
     public static String getBatchDruidQuerySql(List<String> attackTypeList, int currentPart, int partitionNumGrad){
+        long startTime = getTimeLimit()._1;
+        long endTime = getTimeLimit()._2;
         int startPartitionNum = currentPart * partitionNumGrad;
         int endPartitionNum = (currentPart + 1) * partitionNumGrad;
         attackTypeList = attackTypeList.stream().map(attack -> "'"+attack+"'").collect(Collectors.toList());
@@ -138,15 +120,23 @@ public class DruidData {
                 + " >= " + startPartitionNum
                 + " AND " + ApplicationConfig.DRUID_COLUMNNAME_PARTITION_NUM
                 + " < " + endPartitionNum;
+        String timeFilter = ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " >= MILLIS_TO_TIMESTAMP(" + startTime
+                + ") AND " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
+                + " < MILLIS_TO_TIMESTAMP(" + endTime + ")";
 
         return "SELECT "+ ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
                 + ", "+ ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + ", "+ ApplicationConfig.BASELINE_METRIC_TYPE
+                + ", AVG("+ ApplicationConfig.BASELINE_METRIC_TYPE + ") as " + ApplicationConfig.BASELINE_METRIC_TYPE
                 + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
                 + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
                 + " IN " + attackList
-                + " AND " + partitionFilter;
+                + " AND " + timeFilter
+                + " AND " + partitionFilter
+                + " GROUP BY (" + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
+                + ", " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
+                + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME + ")";
     }
 
     /**

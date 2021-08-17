@@ -7,7 +7,6 @@ import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.RetryUtils;
 import cn.mesalab.utils.SeriesUtils;
-import io.vavr.Tuple2;
 import io.vavr.Tuple3;
 import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
@@ -37,6 +36,9 @@ public class BaselineSingleThread extends Thread {
     private final int batchPartitionRange;
     private final int currentBatch;
     private final CountDownLatch countDownLatch;
+
+    private final ArrayList<Integer> frequencyBinCounter = new ArrayList<>(Collections.nCopies(ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM, 0));
+    private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(3, 0));
 
     public BaselineSingleThread(
             List<String> attackTypeList,
@@ -105,12 +107,14 @@ public class BaselineSingleThread extends Thread {
         }
         try {
             hbaseTable.put(putList);
+            LOG.info("MONITOR-IP频率分段统计:" + frequencyBinCounter);
+            LOG.info("MONITOR-生成类别统计:" + generateTypeCounter);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             hbaseUtils.close();
             countDownLatch.countDown();
-            LOG.info("成功写入Baseline条数共计 " + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
+            LOG.info("本线程更新字段数:" + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
         }
     }
 
@@ -164,6 +168,7 @@ public class BaselineSingleThread extends Thread {
 
         // 判断ip出现频率
         float ipFrequency = ipDruidData.size() / (float) completSeries.size();
+        updateLogFrequencyCounter(ipFrequency);
         if(ipFrequency >ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD){
             // 异常值剔除
             baselineGenerationType = 1;
@@ -190,6 +195,7 @@ public class BaselineSingleThread extends Thread {
                 // System.out.println("type-03：" + ipPercentile + " " + ip + " " + Arrays.toString(baselineArr));
             }
         }
+        updateLogGenerateTypeCounter(baselineGenerationType);
 
         return new Tuple3<>(baselineArr, baselineGenerationType, ipPercentile);
     }
@@ -212,4 +218,18 @@ public class BaselineSingleThread extends Thread {
         }
         return result;
     }
+
+    private void updateLogFrequencyCounter(float frequency){
+        int binIndex = (int) Math.floor(frequency * ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM);
+        if(frequency==1){
+            binIndex = frequencyBinCounter.size()-1;
+        }
+        frequencyBinCounter.set(binIndex, frequencyBinCounter.get(binIndex)+1);
+    }
+
+    private void updateLogGenerateTypeCounter(int generateType){
+        int index = generateType-1;
+        generateTypeCounter.set(index, generateTypeCounter.get(index)+1);
+    }
+
 }
