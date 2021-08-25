@@ -103,8 +103,6 @@ public class BaselineSingleThread extends Thread {
                         hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                         hbaseUtils.cachedInPut(putList, ip, generateType, attackType,
                                 ApplicationConfig.BASELINE_METRIC_TYPE + "_" + ApplicationConfig.HBASE_BASELINE_GENERATION_TYPE_SUFFIX);
-                        hbaseUtils.cachedInPut(putList, ip, generateType, attackType,
-                                ApplicationConfig.BASELINE_METRIC_TYPE + "_" + ApplicationConfig.HBASE_BASELINE_GENERATION_TYPE_SUFFIX);
                         hbaseUtils.cachedInPut(putList, ip, zeroReplaceValue, attackType,
                                 ApplicationConfig.BASELINE_METRIC_TYPE + "_" + ApplicationConfig.HBASE_BASELINE_ZERO_REPLACE_VALUE_SUFFIX);
                     }
