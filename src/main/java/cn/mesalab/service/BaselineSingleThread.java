@@ -39,6 +39,7 @@ public class BaselineSingleThread extends Thread {
 
     private final ArrayList<Integer> frequencyBinCounter = new ArrayList<>(Collections.nCopies(ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM, 0));
     private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(3, 0));
+    private int discardCounter = 0;
 
     public BaselineSingleThread(
             List<String> attackTypeList,
@@ -77,8 +78,13 @@ public class BaselineSingleThread extends Thread {
             e.printStackTrace();
         }
 
-        LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
-                "   运行时间：" + (System.currentTimeMillis()- start));
+       try {
+           LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
+                   "   运行时间：" + (System.currentTimeMillis() - start));
+       } catch (Exception e){
+           e.printStackTrace();
+       }
+
 
         // 基线生成
         List<Put> putList = new ArrayList<>();
@@ -107,8 +113,9 @@ public class BaselineSingleThread extends Thread {
         }
         try {
             hbaseTable.put(putList);
-            LOG.info("MONITOR-IP频率分段统计:" + frequencyBinCounter);
-            LOG.info("MONITOR-生成类别统计:" + generateTypeCounter);
+            LOG.info("MONITOR-IP频率分段统计: " + frequencyBinCounter);
+            LOG.info("MONITOR-生成类别统计: " + generateTypeCounter);
+            LOG.info("MONITOR-无baseline生成的(IP,攻击类型)个数: " + discardCounter);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -144,20 +151,22 @@ public class BaselineSingleThread extends Thread {
      *          3：其他类型IP, 采用百分位阈值基线
      */
     private Tuple3<int[], Integer, Integer> generateSingleIpBaseline(String ip, List<Map<String, Object>> ipDruidData){
+        // 无数据（ip-攻击类型）不计算
         if (ipDruidData.size()==0){
+            discardCounter += 1;
             return null;
         }
         List<Integer> originSeries = ipDruidData.stream().map(i ->
                 Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
-        if(Collections.max(originSeries)==0){
+        List<Integer> originNonZeroSeries = originSeries.stream().filter(i->i>0).collect(Collectors.toList());
+
+        // 全零（ip-攻击类型）不计算
+        if(originNonZeroSeries.size()==0){
+            discardCounter += 1;
             return null;
         }
 
         int ipPercentile = SeriesUtils.percentile(originSeries, ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
-        if(ipPercentile == 0){
-            LOG.error(ip + "-" + "IP zero-replace value is 0 !");
-        }
-
         int baselineGenerationType;
         int[] baselineArr = new int[baselinePointNum];
 
@@ -197,7 +206,13 @@ public class BaselineSingleThread extends Thread {
         }
         updateLogGenerateTypeCounter(baselineGenerationType);
 
-        return new Tuple3<>(baselineArr, baselineGenerationType, ipPercentile);
+        // 计算默认值-非零数据的百分位数
+        int defaultValue = SeriesUtils.percentile(originNonZeroSeries, ApplicationConfig.BASELINE_RATIONAL_PERCENTILE);
+        if(defaultValue == 0){
+            LOG.error(ip + "-" + "baseline default value is 0 !");
+        }
+
+        return new Tuple3<>(baselineArr, baselineGenerationType, defaultValue);
     }
 
     /**
