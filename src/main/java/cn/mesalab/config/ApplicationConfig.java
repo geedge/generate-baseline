@@ -22,6 +22,7 @@ public class ApplicationConfig {
     public static final Integer HISTORICAL_GRAD = ConfigUtils.getIntProperty("historical.grad");
     public static final String TIME_FORMAT = ConfigUtils.getStringProperty("time.format");
     public static final String BASELINE_METRIC_TYPE = ConfigUtils.getStringProperty("baseline.metric.type");
+    public static final Integer BASELINE_SAVE_LEVEL = ConfigUtils.getIntProperty("baseline.save.level");
 
     public static final String HBASE_BASELINE_GENERATION_TYPE_SUFFIX = ConfigUtils.getStringProperty("hbase.baseline.generation.type.suffix");
     public static final String HBASE_BASELINE_ZERO_REPLACE_VALUE_SUFFIX = ConfigUtils.getStringProperty("hbase.baseline.zero.replace.value.suffix");

@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 public class BaselineSingleThread extends Thread {
     private static final Logger LOG = LoggerFactory.getLogger(BaselineSingleThread.class);
 
+    private final int BASELINE_SAVE_LEVEL = ApplicationConfig.BASELINE_SAVE_LEVEL;
+
     private final HbaseUtils hbaseUtils;
     private final Table hbaseTable;
     private final List<String> attackTypeList;
@@ -100,7 +102,7 @@ public class BaselineSingleThread extends Thread {
                     int[] ipBaseline = tuple._1;
                     int generateType = tuple._2;
                     int zeroReplaceValue = tuple._3;
-                    if ((ipBaseline!= null ) && (ip.length()>0)){
+                    if ((BASELINE_SAVE_LEVEL >= generateType) && (ipBaseline!= null ) && (ip.length()>0)){
                         hbaseUtils.cachedInPut(putList, ip, ipBaseline, attackType, ApplicationConfig.BASELINE_METRIC_TYPE);
                         hbaseUtils.cachedInPut(putList, ip, generateType, attackType,
                                 ApplicationConfig.BASELINE_METRIC_TYPE + "_" + ApplicationConfig.HBASE_BASELINE_GENERATION_TYPE_SUFFIX);
