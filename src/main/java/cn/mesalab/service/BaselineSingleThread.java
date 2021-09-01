@@ -39,7 +39,8 @@ public class BaselineSingleThread extends Thread {
 
     private final ArrayList<Integer> frequencyBinCounter = new ArrayList<>(Collections.nCopies(ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM, 0));
     private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(3, 0));
-    private int discardCounter = 0;
+    private int discardBaselineCounter = 0;
+    private ArrayList<String> discardIpList = new ArrayList<>();
 
     public BaselineSingleThread(
             List<String> attackTypeList,
@@ -78,12 +79,12 @@ public class BaselineSingleThread extends Thread {
             e.printStackTrace();
         }
 
-       try {
-           LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
-                   "   运行时间：" + (System.currentTimeMillis() - start));
-       } catch (Exception e){
-           e.printStackTrace();
-       }
+        try {
+            LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
+                    "   运行时间：" + (System.currentTimeMillis() - start));
+        } catch (Exception e){
+            e.printStackTrace();
+        }
 
 
         // 基线生成
@@ -111,15 +112,15 @@ public class BaselineSingleThread extends Thread {
         }
         try {
             hbaseTable.put(putList);
-            LOG.info("MONITOR-IP频率分段统计: " + frequencyBinCounter);
-            LOG.info("MONITOR-生成类别统计: " + generateTypeCounter);
-            LOG.info("MONITOR-无baseline生成的(IP,攻击类型)个数: " + discardCounter);
+            LOG.info("MONITOR-IP频率分段统计：" + frequencyBinCounter);
+            LOG.info("MONITOR-生成类别统计：" + generateTypeCounter);
+            LOG.info("MONITOR-无baseline生成的个数：" + discardBaselineCounter + "   其中包括IP共：" + discardIpList.size());
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             hbaseUtils.close();
             countDownLatch.countDown();
-            LOG.info("本线程更新字段数:" + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
+            LOG.info("本线程更新字段数：" + putList.size() + "   剩余线程数量：" + countDownLatch.getCount());
         }
     }
 
@@ -151,7 +152,7 @@ public class BaselineSingleThread extends Thread {
     private Tuple3<int[], Integer, Integer> generateSingleIpBaseline(String ip, List<Map<String, Object>> ipDruidData){
         // 无数据（ip-攻击类型）不计算
         if (ipDruidData.size()==0){
-            discardCounter += 1;
+            updateDiscardCounter(ip);
             return null;
         }
         List<Integer> originSeries = ipDruidData.stream().map(i ->
@@ -160,7 +161,7 @@ public class BaselineSingleThread extends Thread {
 
         // 全零（ip-攻击类型）不计算
         if(originNonZeroSeries.size()==0){
-            discardCounter += 1;
+            updateDiscardCounter(ip);
             return null;
         }
 
@@ -243,6 +244,13 @@ public class BaselineSingleThread extends Thread {
     private void updateLogGenerateTypeCounter(int generateType){
         int index = generateType-1;
         generateTypeCounter.set(index, generateTypeCounter.get(index)+1);
+    }
+
+    private void updateDiscardCounter(String ip){
+        if(!discardIpList.contains(ip)){
+            discardIpList.add(ip);
+        }
+        discardBaselineCounter += 1;
     }
 
 }
