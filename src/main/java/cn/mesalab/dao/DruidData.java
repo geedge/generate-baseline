@@ -130,8 +130,8 @@ public class DruidData {
                 + ", AVG("+ ApplicationConfig.BASELINE_METRIC_TYPE + ") as " + ApplicationConfig.BASELINE_METRIC_TYPE
                 + ", " + ApplicationConfig.DRUID_RECVTIME_COLUMN_NAME
                 + " FROM " + ApplicationConfig.DRUID_TABLE
-                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME
-                + " IN " + attackList
+                + " WHERE " + ApplicationConfig.DRUID_ATTACKTYPE_COLUMN_NAME + " IN " + attackList
+                + " AND " + ApplicationConfig.BASELINE_METRIC_TYPE + " > 0"
                 + " AND " + timeFilter
                 + " AND " + partitionFilter
                 + " GROUP BY (" + ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME
