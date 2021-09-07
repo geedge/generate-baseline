@@ -81,6 +81,10 @@ public class BaselineSingleThread extends Thread {
             e.printStackTrace();
         }
 
+        if(batchDruidData == null){
+            batchDruidData = new HashMap<>();
+        }
+
         try {
             LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
                     "   运行时间：" + (System.currentTimeMillis() - start));
