@@ -131,6 +131,7 @@ public class BaselineSingleThread extends Thread {
         try {
             AvaticaConnection connection = DruidUtils.getConn();
             AvaticaStatement stat = connection.createStatement();
+            stat.setQueryTimeout(ApplicationConfig.DRUID_STATEMENT_QUERY_TIMEOUT);
             String sql = DruidData.getBatchDruidQuerySql(attackTypeList, currentBatch, batchPartitionRange);
             LOG.debug("Read Druid SQL: " + sql);
             readFromDruid = DruidData.readFromDruid(sql, stat);

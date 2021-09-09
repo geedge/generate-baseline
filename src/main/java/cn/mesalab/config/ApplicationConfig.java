@@ -59,9 +59,10 @@ public class ApplicationConfig {
     public static final Double BASELINE_KALMAN_P = ConfigUtils.getDoubleProperty("baseline.kalman.p");
     public static final Double BASELINE_KALMAN_M = ConfigUtils.getDoubleProperty("baseline.kalman.m");
 
-    //public static final Long DRUID_READ_BATCH_TIME_GRAD_HOUR = ConfigUtils.getLongProperty("druid.read.batch.time.grad.hour");
     public static final Integer THREAD_POOL_NUM = ConfigUtils.getIntProperty("thread.pool.num");
     public static final Integer PARTITION_NUM_MAX = ConfigUtils.getIntProperty("druid.partition.num.max");
+    public static final Integer DRUID_STATEMENT_QUERY_TIMEOUT = ConfigUtils.getIntProperty("druid.statement.query.timeout");
+
 
     public static final Integer DRUID_CONNECTION_RETRY_TIME_MAX = ConfigUtils.getIntProperty("druid.connection.retry.time.max");
     public static final Integer DRUID_CONNECTION_RETRY_SLEEP_TIME = ConfigUtils.getIntProperty("druid.connection.retry.sleep.time");

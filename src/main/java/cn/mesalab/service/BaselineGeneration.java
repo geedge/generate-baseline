@@ -2,7 +2,6 @@ package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
 import cn.mesalab.dao.DruidData;
-import cn.mesalab.dao.ReadHistoricalDruidData;
 import cn.mesalab.utils.HbaseUtils;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.vavr.Tuple2;
