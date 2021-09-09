@@ -85,12 +85,8 @@ public class BaselineSingleThread extends Thread {
             batchDruidData = new HashMap<>();
         }
 
-        try {
-            LOG.info("完成数据读取：获取Server IP：" + batchDruidData.size() +
-                    "   运行时间：" + (System.currentTimeMillis() - start));
-        } catch (Exception e){
-            e.printStackTrace();
-        }
+        LOG.info("完成数据处理：获取Server IP：" + batchDruidData.size() +
+                "   运行时间：" + (System.currentTimeMillis() - start));
 
 
         // 基线生成
@@ -136,6 +132,7 @@ public class BaselineSingleThread extends Thread {
             AvaticaConnection connection = DruidUtils.getConn();
             AvaticaStatement stat = connection.createStatement();
             String sql = DruidData.getBatchDruidQuerySql(attackTypeList, currentBatch, batchPartitionRange);
+            LOG.debug("Read Druid SQL: " + sql);
             readFromDruid = DruidData.readFromDruid(sql, stat);
             connection.close();
             stat.close();
@@ -188,14 +185,17 @@ public class BaselineSingleThread extends Thread {
             baselineGenerationType = 1;
             double exceptionPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXECEPTION_PERCENTILE);
             double exceptionFillPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXCECPTION_FILL_PERCENTILE);
+            LOG.debug(ip + ": series-" + series);
             for(int i=0; i<series.size(); i++){
                 if(series.get(i) > exceptionPercentile){
                     series.set(i, (int) exceptionFillPercentile);
                 }
             }
+            LOG.debug(ip + ": execpSeries-" + series);
             // KF
             baselineArr = baselineFunction(series);
             // System.out.println("type-01：" + ipPercentile + " " + ip + " " + Arrays.toString(baselineArr));
+            LOG.debug(ip + ": baseline-" + baselineArr);
         } else {
             // 判断周期性
             if (SeriesUtils.isPeriod(series)){

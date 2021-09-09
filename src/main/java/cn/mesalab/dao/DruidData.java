@@ -29,6 +29,7 @@ public class DruidData {
         Map<String, List<Map<String, Object>>> rsList = null;
         try{
             ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
+            LOG.info("完成数据读取，开始处理数据……");
             rsList = selectAll(resultSet);
         } catch (Exception e){
             e.printStackTrace();
