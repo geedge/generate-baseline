@@ -4,6 +4,7 @@ import cn.mesalab.config.ApplicationConfig;
 import cn.mesalab.utils.DruidUtils;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
+import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -25,17 +26,45 @@ public class DruidData {
 
     private static final Logger LOG = LoggerFactory.getLogger(DruidData.class);
 
-    public static Map<String, List<Map<String, Object>>> readFromDruid(String sql, AvaticaStatement statement){
-        Map<String, List<Map<String, Object>>> rsList = null;
-        try{
-            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
-            LOG.info("完成数据读取，开始处理数据……");
-            rsList = selectAll(resultSet);
-        } catch (Exception e){
-            e.printStackTrace();
+    public static ArrayList<Map<String, Object>> loadFromIterator(ResultSet rs) {
+        ArrayList<Map<String, Object>> result = new ArrayList<>();
+
+        try {
+            ResultSetMetaData rmd = rs.getMetaData();
+            int columnCount = rmd.getColumnCount();
+
+            while (rs.next()) {
+                Map<String, Object> rowData = new HashMap<>();
+                for (int i = 1; i <= columnCount; ++i) {
+                    rowData.put(rmd.getColumnName(i), rs.getObject(i));
+                }
+                result.add(rowData);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        return rsList;
+
+        return result;
     }
+
+    public static Map<String, List<Map<String, Object>>> selectAll(List<Map<String, Object>> result) {
+        Map<String, List<Map<String, Object>>> allIpDataList = new HashMap<>();
+        ArrayList<String> ipList = new ArrayList<>();
+
+        for (Map<String, Object> rowData : result) {
+            String ip = (String) rowData.get(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
+            if (!ipList.contains(ip)) {
+                ipList.add(ip);
+                List<Map<String, Object>> ipData = new ArrayList<>();
+                allIpDataList.put(ip, ipData);
+            }
+            rowData.remove(ApplicationConfig.DRUID_SERVERIP_COLUMN_NAME);
+            allIpDataList.get(ip).add(rowData);
+        }
+
+        return allIpDataList;
+    }
+
 
     /**
      * 处理Druid读取返回数据为Map<String, List<Map<String, Object>>>形式
@@ -71,6 +100,9 @@ public class DruidData {
         }
         return allIpDataList;
     }
+
+
+
 
     /**
      * 计算查询时间范围，可指定时间范围（测试）或使用默认配置

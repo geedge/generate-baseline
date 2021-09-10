@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -66,7 +67,6 @@ public class BaselineSingleThread extends Thread {
     public void run(){
         long start = System.currentTimeMillis();
         // 数据读取
-        LOG.info("开始数据读取");
         Map<String, List<Map<String, Object>>> batchDruidData = new HashMap<>();
         // Druid retry
         try {
@@ -113,10 +113,11 @@ public class BaselineSingleThread extends Thread {
             }
         }
         try {
-            hbaseTable.put(putList);
             LOG.info("MONITOR-IP频率分段统计：" + frequencyBinCounter);
             LOG.info("MONITOR-生成类别统计：" + generateTypeCounter);
             LOG.info("MONITOR-无baseline生成的个数：" + discardBaselineCounter + "   其中包括IP共：" + discardIpList.size());
+            hbaseTable.put(putList);
+            LOG.info("MONITOR-完成hbase写入");
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -130,13 +131,21 @@ public class BaselineSingleThread extends Thread {
         Map<String, List<Map<String, Object>>> readFromDruid = new HashMap<>();
         try {
             AvaticaConnection connection = DruidUtils.getConn();
-            AvaticaStatement stat = connection.createStatement();
-            stat.setQueryTimeout(ApplicationConfig.DRUID_STATEMENT_QUERY_TIMEOUT);
+            AvaticaStatement statement = connection.createStatement();
+            statement.setQueryTimeout(ApplicationConfig.DRUID_STATEMENT_QUERY_TIMEOUT);
             String sql = DruidData.getBatchDruidQuerySql(attackTypeList, currentBatch, batchPartitionRange);
             LOG.debug("Read Druid SQL: " + sql);
-            readFromDruid = DruidData.readFromDruid(sql, stat);
+
+            LOG.info("开始数据读取");
+            ResultSet resultSet = DruidUtils.executeQuery(statement, sql);
+            ArrayList<Map<String, Object>> maps = DruidData.loadFromIterator(resultSet);
             connection.close();
-            stat.close();
+            statement.close();
+
+            LOG.info("开始数据处理");
+            readFromDruid = DruidData.selectAll(maps);
+            LOG.info("完成数据处理");
+
         } catch (SQLException e){
             e.printStackTrace();
         }
