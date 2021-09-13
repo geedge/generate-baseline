@@ -32,8 +32,6 @@ public class BaselineSingleThread extends Thread {
 
     private final int BASELINE_SAVE_LEVEL = ApplicationConfig.BASELINE_SAVE_LEVEL;
 
-    private final HbaseUtils hbaseUtils;
-    private final Table hbaseTable;
     private final List<String> attackTypeList;
     private final Integer baselinePointNum;
     private final int batchPartitionRange;
@@ -52,9 +50,6 @@ public class BaselineSingleThread extends Thread {
             int currentBatch,
             CountDownLatch countDownLatch
     ){
-        hbaseUtils = HbaseUtils.getInstance();
-
-        this.hbaseTable = hbaseUtils.getHbaseTable();
         this.attackTypeList = attackTypeList;
         this.baselinePointNum = baselinePointNum;
         this.batchPartitionRange = batchPartitionRange;
@@ -65,6 +60,8 @@ public class BaselineSingleThread extends Thread {
     @SuppressWarnings("unchecked")
     @Override
     public void run(){
+        HbaseUtils hbaseUtils = HbaseUtils.getInstance();
+        Table hbaseTable = hbaseUtils.getHbaseTable();
         long start = System.currentTimeMillis();
         // 数据读取
         Map<String, List<Map<String, Object>>> batchDruidData = new HashMap<>();
@@ -144,7 +141,6 @@ public class BaselineSingleThread extends Thread {
 
             LOG.info("开始数据处理");
             readFromDruid = DruidData.selectAll(maps);
-            LOG.info("完成数据处理");
 
         } catch (SQLException e){
             e.printStackTrace();
