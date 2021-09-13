@@ -59,7 +59,11 @@ public class ApplicationConfig {
     public static final Double BASELINE_KALMAN_P = ConfigUtils.getDoubleProperty("baseline.kalman.p");
     public static final Double BASELINE_KALMAN_M = ConfigUtils.getDoubleProperty("baseline.kalman.m");
 
-    public static final Integer THREAD_POOL_NUM = ConfigUtils.getIntProperty("thread.pool.num");
+    public static final Integer ALL_PARTITION_NUM = ConfigUtils.getIntProperty("all.partition.num");
+    public static final Integer MAX_POOL_SIZE = ConfigUtils.getIntProperty("max.pool.size");
+    public static final Integer CORE_POOL_SIZE = ConfigUtils.getIntProperty("core.pool.size");
+
+
     public static final Integer PARTITION_NUM_MAX = ConfigUtils.getIntProperty("druid.partition.num.max");
     public static final Integer DRUID_STATEMENT_QUERY_TIMEOUT = ConfigUtils.getIntProperty("druid.statement.query.timeout");
 

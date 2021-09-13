@@ -2,11 +2,8 @@ package cn.mesalab.service;
 
 import cn.mesalab.config.ApplicationConfig;
 import cn.mesalab.dao.DruidData;
-import cn.mesalab.utils.HbaseUtils;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.vavr.Tuple2;
-import org.apache.commons.collections.ListUtils;
-import org.apache.hadoop.hbase.client.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,9 +29,9 @@ public class BaselineGeneration {
             ApplicationConfig.BASELINE_RANGE_DAYS * 24 * (60/ApplicationConfig.HISTORICAL_GRAD);
 
     private static final Tuple2<Long, Long> START_END_TIMES = DruidData.getTimeLimit();
-    private static final int threadPoolNum = ApplicationConfig.THREAD_POOL_NUM;
+    private static final int allPartitionNum = ApplicationConfig.ALL_PARTITION_NUM;
     // 每个线程读取数据所覆盖的partition_num个数
-    private static final int batchPartitionRange = (int) Math.ceil(ApplicationConfig.PARTITION_NUM_MAX /(double)threadPoolNum);
+    private static final int batchPartitionRange = (int) Math.ceil(ApplicationConfig.PARTITION_NUM_MAX /(double) allPartitionNum);
 
     /**
      * 程序执行
@@ -54,16 +51,16 @@ public class BaselineGeneration {
     }
 
     private static void baselineGeneration() throws InterruptedException {
-        CountDownLatch generateCountDownLatch = new CountDownLatch(threadPoolNum);
+        CountDownLatch generateCountDownLatch = new CountDownLatch(allPartitionNum);
 
         ThreadFactory generationThreadFactory = new ThreadFactoryBuilder()
                 .setNameFormat("baseline-generate-%d").build();
         ThreadPoolExecutor generationExecutor = new ThreadPoolExecutor(
-                threadPoolNum, threadPoolNum, 0L,
+                ApplicationConfig.CORE_POOL_SIZE, ApplicationConfig.MAX_POOL_SIZE, 0L,
                 TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(1024), generationThreadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
 
-        for(int threadCount = 0; threadCount<threadPoolNum; threadCount++){
+        for(int threadCount = 0; threadCount< allPartitionNum; threadCount++){
             BaselineSingleThread baselineSingleThread = new BaselineSingleThread(
                     ATTACK_TYPE_LIST,
                     BASELINE_POINT_NUM,
