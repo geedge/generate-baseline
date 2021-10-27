@@ -39,7 +39,7 @@ public class BaselineSingleThread extends Thread {
     private final CountDownLatch countDownLatch;
 
     private final ArrayList<Integer> frequencyBinCounter = new ArrayList<>(Collections.nCopies(ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM, 0));
-    private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(3, 0));
+    private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(2, 0));
     private int discardBaselineCounter = 0;
     private ArrayList<String> discardIpList = new ArrayList<>();
 
