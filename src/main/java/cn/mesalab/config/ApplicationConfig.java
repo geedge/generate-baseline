@@ -48,6 +48,8 @@ public class ApplicationConfig {
     public static final Integer BASELINE_RANGE_DAYS = ConfigUtils.getIntProperty("baseline.range.days");
     public static final Float BASELINE_RATIONAL_PERCENTILE = ConfigUtils.getFloatProperty("baseline.rational.percentile");
 
+    public static final Float BASELINE_TIMES_PERCENT_TIMES = ConfigUtils.getFloatProperty("baseline.times.percent.times");
+
 
     public static final String HBASE_TABLE = ConfigUtils.getStringProperty("hbase.table");
     public static final String HBASE_ZOOKEEPER_QUORUM= ConfigUtils.getStringProperty("hbase.zookeeper.quorum");

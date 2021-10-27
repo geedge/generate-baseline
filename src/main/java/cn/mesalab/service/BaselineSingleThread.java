@@ -183,12 +183,10 @@ public class BaselineSingleThread extends Thread {
         List<Integer>series = completSeries.stream().map(
                 i -> Integer.valueOf(i.get(ApplicationConfig.BASELINE_METRIC_TYPE).toString())).collect(Collectors.toList());
 
-        // 判断ip出现频率
-        float ipFrequency = ipDruidData.size() / (float) completSeries.size();
-        updateLogFrequencyCounter(ipFrequency);
-        if(ipFrequency >ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD){
-            // 异常值剔除
+        // 具备周期性
+        if(SeriesUtils.isPeriod(series)){
             baselineGenerationType = 1;
+            // 异常值剔除
             double exceptionPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXECEPTION_PERCENTILE);
             double exceptionFillPercentile = SeriesUtils.percentile(series, ApplicationConfig.BASELINE_EXCECPTION_FILL_PERCENTILE);
             LOG.debug(ip + ": series-" + series);
@@ -197,24 +195,24 @@ public class BaselineSingleThread extends Thread {
                     series.set(i, (int) exceptionFillPercentile);
                 }
             }
-            LOG.debug(ip + ": execpSeries-" + series);
             // KF
             baselineArr = baselineFunction(series);
-            // System.out.println("type-01：" + ipPercentile + " " + ip + " " + Arrays.toString(baselineArr));
-            LOG.debug(ip + ": baseline-" + baselineArr);
         } else {
-            // 判断周期性
-            if (SeriesUtils.isPeriod(series)){
+            double p99 = SeriesUtils.percentile(series, 0.99);
+            double p50 = SeriesUtils.percentile(series, 0.50);
+
+            // 无周期性
+            float ipFrequency = ipDruidData.size() / (float) completSeries.size();
+            updateLogFrequencyCounter(ipFrequency);
+            // p99/p50 > 10
+            if(ipFrequency >ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD && p99/p50 > ApplicationConfig.BASELINE_TIMES_PERCENT_TIMES){
                 baselineGenerationType = 2;
-                // KF
-                baselineArr = baselineFunction(series);
-                // System.out.println("type-02：" + ipPercentile + " " + ip + " " + Arrays.toString(baselineArr));
-            } else {
-                baselineGenerationType = 3;
                 Arrays.fill(baselineArr, ipPercentile);
-                // System.out.println("type-03：" + ipPercentile + " " + ip + " " + Arrays.toString(baselineArr));
+            } else {
+                return null;
             }
         }
+
         updateLogGenerateTypeCounter(baselineGenerationType);
 
         // 计算默认值-非零数据的百分位数
