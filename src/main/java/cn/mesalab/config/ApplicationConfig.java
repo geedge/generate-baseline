@@ -50,6 +50,9 @@ public class ApplicationConfig {
 
     public static final Float BASELINE_TIMES_PERCENT_TIMES = ConfigUtils.getFloatProperty("baseline.times.percent.times");
 
+    public static final Float BASELINE_TYPE2_PERCENTILE = ConfigUtils.getFloatProperty("baseline.type2.percentile");
+    public static final Float BASELINE_TYPE3_PERCENTILE = ConfigUtils.getFloatProperty("baseline.type3.percentile");
+
 
     public static final String HBASE_TABLE = ConfigUtils.getStringProperty("hbase.table");
     public static final String HBASE_ZOOKEEPER_QUORUM= ConfigUtils.getStringProperty("hbase.zookeeper.quorum");

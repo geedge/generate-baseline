@@ -7,6 +7,7 @@ import cn.mesalab.utils.DruidUtils;
 import cn.mesalab.utils.HbaseUtils;
 import cn.mesalab.utils.RetryUtils;
 import cn.mesalab.utils.SeriesUtils;
+import com.google.common.collect.Lists;
 import io.vavr.Tuple3;
 import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.avatica.AvaticaStatement;
@@ -39,7 +40,7 @@ public class BaselineSingleThread extends Thread {
     private final CountDownLatch countDownLatch;
 
     private final ArrayList<Integer> frequencyBinCounter = new ArrayList<>(Collections.nCopies(ApplicationConfig.MONITOR_FREQUENCY_BIN_NUM, 0));
-    private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(2, 0));
+    private final ArrayList<Integer> generateTypeCounter = new ArrayList<>(Collections.nCopies(3, 0));
     private int discardBaselineCounter = 0;
     private ArrayList<String> discardIpList = new ArrayList<>();
 
@@ -204,12 +205,13 @@ public class BaselineSingleThread extends Thread {
             // 无周期性
             float ipFrequency = ipDruidData.size() / (float) completSeries.size();
             updateLogFrequencyCounter(ipFrequency);
-            // p99/p50 > 10
-            if(ipFrequency >ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD && p99/p50 > ApplicationConfig.BASELINE_TIMES_PERCENT_TIMES){
+            // 频率判断
+            if(ipFrequency >ApplicationConfig.BASELINE_HISTORICAL_FREQUENCY_THREAD ){
                 baselineGenerationType = 2;
-                Arrays.fill(baselineArr, ipPercentile);
+                Arrays.fill(baselineArr, SeriesUtils.percentile(series, ApplicationConfig.BASELINE_TYPE2_PERCENTILE));
             } else {
-                return null;
+                baselineGenerationType = 3;
+                Arrays.fill(baselineArr, SeriesUtils.percentile(series, ApplicationConfig.BASELINE_TYPE3_PERCENTILE));
             }
         }
 
